@@ -22,6 +22,7 @@ if (GTest_FOUND)
         drivers/test_hqrrp.cc
         drivers/test_abrik.cc
         drivers/test_orth_linop.cc
+        matrix_api/test_cqrrpt_matrix.cc
         misc/test_util.cc
         misc/test_pdkernels.cc
         linops/test_linops.cc
