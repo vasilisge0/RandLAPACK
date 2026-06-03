@@ -220,5 +220,34 @@ namespace experimental {
 #define INSTANTIATE_ALL_DEVICE_PAIRS_FP_PAIRS(func, sig) \
     FOR_ALL_DEVICES(_INST_DPDP_DSRC, func, sig)
 
+// ---------------------------------------------------------------------------
+// INSTANTIATE_ALL_FP_PAIRS_INDEX_PAIRS
+// For template<typename vi, typename vo, typename ii, typename io>
+// Generates 3 * 3 * 2 * 2 = 36 instantiations.
+// ---------------------------------------------------------------------------
+#define _INST_FPIP(vi, vo, ii, io, func, sig) \
+    template void func<vi, vo, ii, io>(REMOVE_PARENS sig);
+
+#define _INST_FPIP_IOUT(io, vi, vo, ii, func, sig) \
+    _INST_FPIP(vi, vo, ii, io, func, sig)
+
+#define _INST_FPIP_IIN(ii, vi, vo, func, sig)       \
+    _INST_FPIP_IOUT(int32_t, vi, vo, ii, func, sig) \
+    _INST_FPIP_IOUT(int64_t, vi, vo, ii, func, sig)
+
+#define _INST_FPIP_VOUT(vo, vi, func, sig)       \
+    _INST_FPIP_IIN(int32_t, vi, vo, func, sig)   \
+    _INST_FPIP_IIN(int64_t, vi, vo, func, sig)
+
+#define _INST_FPIP_VIN(vi, func, sig)            \
+    _INST_FPIP_VOUT(double, vi, func, sig)       \
+    _INST_FPIP_VOUT(float,  vi, func, sig)       \
+    _INST_FPIP_VOUT(__half, vi, func, sig)
+
+#define INSTANTIATE_ALL_FP_PAIRS_INDEX_PAIRS(func, sig) \
+    _INST_FPIP_VIN(double, func, sig)                   \
+    _INST_FPIP_VIN(float,  func, sig)                   \
+    _INST_FPIP_VIN(__half, func, sig)
+
 }   // namespace experimental
 }   // namespace RandLAPACK
