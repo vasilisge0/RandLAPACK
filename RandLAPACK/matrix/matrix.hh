@@ -142,6 +142,7 @@ void copy_sparse_storage(dim<2> size, Device source_dev, Device target_dev,
 
 // Forward declaration of matrix views
 
+template <typename value_t>
 struct StridedView;
 
 struct CsrView;
@@ -240,7 +241,8 @@ struct SparseState {
 // Dense/Sparse matrix interfaces
 
 struct Dense {
-    friend struct StridedView;
+    template <typename value_t>
+    friend struct RandLAPACK::StridedView;
 
    public:
     static std::unique_ptr<Dense> create_strided(dim<2> size,
@@ -329,19 +331,25 @@ struct Sparse {
 // metadata and data pointers from the Matrix object, and this view object will
 // be passed to the apply call in sketch_general.
 
+template <typename value_t>
 struct StridedView {
     dim<2> size_;
     Layout layout_ = RandLAPACK::Layout::COL_MAJOR;
-    NumericPtrVariant values_;
+    value_t* values_;
     Device device_;
     size_t lead_dim_ = 0;
     StridedView(Dense& source)
         : size_(source.state_.size_),
           lead_dim_(std::get<StridedStorage>(source.state_.storage_).lead_dim_),
           layout_(std::get<StridedStorage>(source.state_.storage_).layout_),
-          values_(std::get<StridedStorage>(source.state_.storage_).values_),
+          values_(std::get<value_t*>(
+              std::get<StridedStorage>(source.state_.storage_).values_)),
           device_(source.state_.device_) {}
 };  // StridedView
+
+template struct StridedView<double>;
+template struct StridedView<float>;
+template struct StridedView<half>;
 
 struct CsrView {
     // dim<2> size_;
@@ -354,5 +362,7 @@ struct CsrView {
     //   values_(std::get<CsrStorage>(source.state_.storage_).values_),
     //   device_(source.state_.device_) {}
 };  // CsrView
+
+using Matrix = std::variant<std::unique_ptr<Dense>, std::unique_ptr<Sparse>>;
 
 }  // namespace RandLAPACK
