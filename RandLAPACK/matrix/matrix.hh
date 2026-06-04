@@ -37,7 +37,7 @@ struct CsrDescriptor {
     CsrDescriptor() = delete;
     CsrDescriptor(size_t nnz, NumericType store_type, IntType index_type)
         : index_type_(index_type), nnz_(nnz), store_type_(store_type) {}
-};  // CsrDescriptor
+};
 
 struct MatrixDescriptor {
     std::variant<StridedDescriptor, CsrDescriptor> storage_descriptor_;
@@ -58,7 +58,7 @@ struct MatrixDescriptor {
         return std::visit([](auto&& arg) -> dim<2> { return arg.size_; },
                           storage_descriptor_);
     }
-};  // MatrixDescriptor
+};
 
 // Helper functions definitions for initialization and freeing of matrix
 // storage. These functions will be called by the constructors and destructors
@@ -96,14 +96,14 @@ void initialize_dense_storage(dim<2> size, Device dev, DenseStorage& source) {
         static_cast<MatrixFormat>(source.index()), dev,
         get_numeric_type(source));
     fn(size, source);
-}  // initialize_dense_storage
+}
 
 void free_dense_storage(Device dev, DenseStorage& source) {
     auto fn = StorageRegistry::get().lookup_free_dense(
         static_cast<MatrixFormat>(source.index()), dev,
         get_numeric_type(source));
     fn(source);
-}  // free_dense_storage
+}
 
 void copy_dense_storage(dim<2> size, Device source_dev, Device target_dev,
                         DenseStorage& source, DenseStorage& target) {
@@ -112,21 +112,21 @@ void copy_dense_storage(dim<2> size, Device source_dev, Device target_dev,
         static_cast<MatrixFormat>(target.index()), source_dev, target_dev,
         get_numeric_type(source), get_numeric_type(target));
     fn(size, source, target);
-}  // copy_dense_storage
+}
 
 void initialize_sparse_storage(Device dev, SparseStorage& source) {
     auto fn = StorageRegistry::get().lookup_sparse_initialize(
         static_cast<MatrixFormat>(source.index()), dev,
         get_numeric_type(source), get_index_type(source));
     fn(get_size(source), source);
-}  // initialize_sparse_storage
+}
 
 void free_sparse_storage(Device dev, SparseStorage& source) {
     auto fn = StorageRegistry::get().lookup_sparse_free(
         static_cast<MatrixFormat>(source.index()), dev,
         get_numeric_type(source), get_index_type(source));
     fn(source);
-}  // free_sparse_storage
+}
 
 void copy_sparse_storage(dim<2> size, Device source_dev, Device target_dev,
                          SparseStorage& source, SparseStorage& target) {
@@ -136,7 +136,7 @@ void copy_sparse_storage(dim<2> size, Device source_dev, Device target_dev,
         get_numeric_type(source), get_numeric_type(target),
         get_index_type(source), get_index_type(target));
     fn(size, source, target);
-}  // copy_sparse_storage
+}
 
 }  // namespace detail
 
@@ -160,7 +160,7 @@ struct DenseState {
                NumericType store_precision)
         : device_(device), storage_(StridedStorage(size, size[0], layout)) {
         detail::initialize_dense_storage(size, device_, storage_);
-    }  // DenseState
+    }
 
     DenseState(MatrixDescriptor descriptor, Device device) {
         device_ = device;
@@ -172,11 +172,9 @@ struct DenseState {
                                       dense_descr.layout_);
             detail::initialize_dense_storage(size_, device_, storage_);
         }
-    }  // DenseState
+    }
 
-    ~DenseState() {
-        detail::free_dense_storage(device_, storage_);
-    }  // ~DenseState
+    ~DenseState() { detail::free_dense_storage(device_, storage_); }
 
     void copy_from(DenseState& source) {
         if (storage_.index() != source.storage_.index())

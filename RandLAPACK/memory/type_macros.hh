@@ -158,6 +158,50 @@ namespace experimental {
     F(int32_t, ##__VA_ARGS__)            \
     F(int64_t, ##__VA_ARGS__)
 
+#define FOR_ALL_INDEX_PAIRS(F, ...)              \
+    F(int32_t, int32_t, ##__VA_ARGS__)           \
+    F(int32_t, int64_t, ##__VA_ARGS__)           \
+    F(int64_t, int32_t, ##__VA_ARGS__)           \
+    F(int64_t, int64_t, ##__VA_ARGS__)
+
+#define FOR_ALL_FP_PAIRS_INDEX_PAIRS(F, ...)                    \
+    F(double, double, int32_t, int32_t, ##__VA_ARGS__)          \
+    F(double, double, int32_t, int64_t, ##__VA_ARGS__)          \
+    F(double, double, int64_t, int32_t, ##__VA_ARGS__)          \
+    F(double, double, int64_t, int64_t, ##__VA_ARGS__)          \
+    F(double, float,  int32_t, int32_t, ##__VA_ARGS__)          \
+    F(double, float,  int32_t, int64_t, ##__VA_ARGS__)          \
+    F(double, float,  int64_t, int32_t, ##__VA_ARGS__)          \
+    F(double, float,  int64_t, int64_t, ##__VA_ARGS__)          \
+    F(double, __half, int32_t, int32_t, ##__VA_ARGS__)          \
+    F(double, __half, int32_t, int64_t, ##__VA_ARGS__)          \
+    F(double, __half, int64_t, int32_t, ##__VA_ARGS__)          \
+    F(double, __half, int64_t, int64_t, ##__VA_ARGS__)          \
+    F(float,  double, int32_t, int32_t, ##__VA_ARGS__)          \
+    F(float,  double, int32_t, int64_t, ##__VA_ARGS__)          \
+    F(float,  double, int64_t, int32_t, ##__VA_ARGS__)          \
+    F(float,  double, int64_t, int64_t, ##__VA_ARGS__)          \
+    F(float,  float,  int32_t, int32_t, ##__VA_ARGS__)          \
+    F(float,  float,  int32_t, int64_t, ##__VA_ARGS__)          \
+    F(float,  float,  int64_t, int32_t, ##__VA_ARGS__)          \
+    F(float,  float,  int64_t, int64_t, ##__VA_ARGS__)          \
+    F(float,  __half, int32_t, int32_t, ##__VA_ARGS__)          \
+    F(float,  __half, int32_t, int64_t, ##__VA_ARGS__)          \
+    F(float,  __half, int64_t, int32_t, ##__VA_ARGS__)          \
+    F(float,  __half, int64_t, int64_t, ##__VA_ARGS__)          \
+    F(__half, double, int32_t, int32_t, ##__VA_ARGS__)          \
+    F(__half, double, int32_t, int64_t, ##__VA_ARGS__)          \
+    F(__half, double, int64_t, int32_t, ##__VA_ARGS__)          \
+    F(__half, double, int64_t, int64_t, ##__VA_ARGS__)          \
+    F(__half, float,  int32_t, int32_t, ##__VA_ARGS__)          \
+    F(__half, float,  int32_t, int64_t, ##__VA_ARGS__)          \
+    F(__half, float,  int64_t, int32_t, ##__VA_ARGS__)          \
+    F(__half, float,  int64_t, int64_t, ##__VA_ARGS__)          \
+    F(__half, __half, int32_t, int32_t, ##__VA_ARGS__)          \
+    F(__half, __half, int32_t, int64_t, ##__VA_ARGS__)          \
+    F(__half, __half, int64_t, int32_t, ##__VA_ARGS__)          \
+    F(__half, __half, int64_t, int64_t, ##__VA_ARGS__)
+
 #define FOR_ALL_DEVICES(F, ...)         \
     F(Device::CPU,  ##__VA_ARGS__)      \
     F(Device::OMP,  ##__VA_ARGS__)      \

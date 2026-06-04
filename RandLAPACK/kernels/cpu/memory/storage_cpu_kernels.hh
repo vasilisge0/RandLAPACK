@@ -25,7 +25,7 @@ void strided_copy_kernel(dim<2> size, value_in_t* values_in, size_t ld_in,
             }
         }
     }
-}  // end of copy_kernel()
+}
 
 template <typename value_in_t, typename value_out_t, typename index_in_t,
           typename index_out_t>
@@ -48,7 +48,7 @@ __host__ void csr_copy_impl(dim<2> size, SparseStorage& source,
         throw std::runtime_error(
             "Copying values from matrixs of different types.");
     }
-}  // csr_copy_impl
+}
 
 }  // namespace cpu
 }  // namespace RandLAPACK

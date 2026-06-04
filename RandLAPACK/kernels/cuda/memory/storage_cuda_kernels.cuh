@@ -26,28 +26,31 @@ __global__ void copy_kernel(size_t nrows, size_t ncols, value_t* mtx_in,
                 static_cast<value_out_t>(mtx_in[row + ld_in * col]);
         }
     }
-}  // copy_kernel
+}
 
 #define INST_COPY_KERNEL(T1, T2)                                           \
     template __global__ void copy_kernel<T1, T2>(size_t, size_t, T1*, int, \
                                                  T2*, int);
 
 FOR_ALL_FP_PAIRS(INST_COPY_KERNEL)
+FOR_ALL_INDEX_PAIRS(INST_COPY_KERNEL)
 
 template <typename value_in_t, typename value_out_t>
-__host__ void copy_launcher(dim<2> size, value_out_t* mtx_in, int ld_in,
-                            value_in_t* mtx_out, int ld_out) {
+__host__ void copy_launcher(dim<2> size, value_in_t* mtx_in, int ld_in,
+                            value_out_t* mtx_out, int ld_out) {
     dim3 block_size(16, 16);
     dim3 grid_size((size[1] + block_size.x - 1) / block_size.x,
                    (size[0] + block_size.y - 1) / block_size.y);
     copy_kernel<<<grid_size, block_size>>>(size[0], size[1], mtx_in, ld_in,
                                            mtx_out, ld_out);
-}  // copy_launcher
+}
 
-#define INST_COPY_LAUNCHER(T1, T2) \
-    template __host__ void copy_launcher<T1, T2>(dim<2>, T1*, int, T2*, int);
+#define INST_COPY_LAUNCHER(value_in_t, value_out_t)                \
+    template __host__ void copy_launcher<value_in_t, value_out_t>( \
+        dim<2>, value_in_t*, int, value_out_t*, int);
 
 FOR_ALL_FP_PAIRS(INST_COPY_LAUNCHER)
+FOR_ALL_INDEX_PAIRS(INST_COPY_LAUNCHER)
 
 template <typename value_in_t, typename value_out_t>
 __host__ void dense_copy_impl(dim<2> size, DenseStorage& source,
@@ -76,7 +79,7 @@ __host__ void dense_copy_impl(dim<2> size, DenseStorage& source,
             }
         },
         source, target);
-}  // copy_impl
+}
 
 #define INST_DENSE_COPY_IMPL(T1, T2)                                      \
     template __host__ void dense_copy_impl<T1, T2>(dim<2>, DenseStorage&, \

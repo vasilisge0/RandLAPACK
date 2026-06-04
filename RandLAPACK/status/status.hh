@@ -6,4 +6,4 @@ namespace RandLAPACK {
 
 enum Status { SUCCESS, FAILURE };
 
-}   // RandLAPACK
+}  // namespace RandLAPACK
