@@ -92,14 +92,14 @@ dim<2> get_size(SparseStorage& source) {
 }
 
 void initialize_dense_storage(dim<2> size, Device dev, DenseStorage& source) {
-    auto fn = StorageRegistry::get().lookup_initialize_dense(
+    auto fn = dispatch::Dense::get().lookup_initialize(
         static_cast<MatrixFormat>(source.index()), dev,
         get_numeric_type(source));
     fn(size, source);
 }
 
 void free_dense_storage(Device dev, DenseStorage& source) {
-    auto fn = StorageRegistry::get().lookup_free_dense(
+    auto fn = dispatch::Dense::get().lookup_free(
         static_cast<MatrixFormat>(source.index()), dev,
         get_numeric_type(source));
     fn(source);
@@ -107,22 +107,22 @@ void free_dense_storage(Device dev, DenseStorage& source) {
 
 void copy_dense_storage(dim<2> size, Device source_dev, Device target_dev,
                         DenseStorage& source, DenseStorage& target) {
-    auto fn = StorageRegistry::get().lookup_copy_dense(
-        static_cast<MatrixFormat>(static_cast<MatrixFormat>(source.index())),
+    auto fn = dispatch::Dense::get().lookup_copy(
+        static_cast<MatrixFormat>(source.index()),
         static_cast<MatrixFormat>(target.index()), source_dev, target_dev,
         get_numeric_type(source), get_numeric_type(target));
     fn(size, source, target);
 }
 
 void initialize_sparse_storage(Device dev, SparseStorage& source) {
-    auto fn = StorageRegistry::get().lookup_sparse_initialize(
+    auto fn = dispatch::Sparse::get().lookup_initialize(
         static_cast<MatrixFormat>(source.index()), dev,
         get_numeric_type(source), get_index_type(source));
     fn(get_size(source), source);
 }
 
 void free_sparse_storage(Device dev, SparseStorage& source) {
-    auto fn = StorageRegistry::get().lookup_sparse_free(
+    auto fn = dispatch::Sparse::get().lookup_free(
         static_cast<MatrixFormat>(source.index()), dev,
         get_numeric_type(source), get_index_type(source));
     fn(source);
@@ -130,7 +130,7 @@ void free_sparse_storage(Device dev, SparseStorage& source) {
 
 void copy_sparse_storage(dim<2> size, Device source_dev, Device target_dev,
                          SparseStorage& source, SparseStorage& target) {
-    auto fn = StorageRegistry::get().lookup_copy_sparse(
+    auto fn = dispatch::Sparse::get().lookup_copy(
         static_cast<MatrixFormat>(source.index()),
         static_cast<MatrixFormat>(target.index()), source_dev, target_dev,
         get_numeric_type(source), get_numeric_type(target),
