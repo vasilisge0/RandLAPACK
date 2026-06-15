@@ -332,4 +332,85 @@ private:
 };  // Sparse
 
 }  // namespace dispatch
+
+namespace detail {
+
+// Helper functions definitions for initialization and freeing of matrix
+// storage. These functions will be called by the constructors and destructors
+// of MatrixInternals to initialize and free the matrix storage, and these
+// functions will lookup the correct function pointer from the MatrixRegistry to
+// call the correct initialize and free functions for different matrix types,
+// devices, and numeric types.
+
+NumericType get_numeric_type(DenseStorage& source) {
+    return static_cast<NumericType>(
+        std::get<StridedStorage>(source).values_.index());
+}
+
+NumericType get_numeric_type(SparseStorage& source) {
+    return static_cast<NumericType>(
+        std::get<CsrStorage>(source).values_.index());
+}
+
+IntType get_index_type(SparseStorage& source) {
+    return static_cast<IntType>(std::get<CsrStorage>(source).row_ptrs_.index());
+}
+
+dim<2> get_size(DenseStorage& source) {
+    return std::get<StridedStorage>(source).size_;
+}
+
+dim<2> get_size(SparseStorage& source) {
+    return std::get<CsrStorage>(source).size_;
+}
+
+void initialize_dense_storage(dim<2> size, Device dev, DenseStorage& source) {
+    auto fn = dispatch::Dense::get().lookup_initialize(
+        static_cast<MatrixFormat>(source.index()), dev,
+        get_numeric_type(source));
+    fn(size, source);
+}
+
+void free_dense_storage(Device dev, DenseStorage& source) {
+    auto fn = dispatch::Dense::get().lookup_free(
+        static_cast<MatrixFormat>(source.index()), dev,
+        get_numeric_type(source));
+    fn(source);
+}
+
+void copy_dense_storage(dim<2> size, Device source_dev, Device target_dev,
+                        DenseStorage& source, DenseStorage& target) {
+    auto fn = dispatch::Dense::get().lookup_copy(
+        static_cast<MatrixFormat>(source.index()),
+        static_cast<MatrixFormat>(target.index()), source_dev, target_dev,
+        get_numeric_type(source), get_numeric_type(target));
+    fn(size, source, target);
+}
+
+void initialize_sparse_storage(Device dev, SparseStorage& source) {
+    auto fn = dispatch::Sparse::get().lookup_initialize(
+        static_cast<MatrixFormat>(source.index()), dev,
+        get_numeric_type(source), get_index_type(source));
+    fn(get_size(source), source);
+}
+
+void free_sparse_storage(Device dev, SparseStorage& source) {
+    auto fn = dispatch::Sparse::get().lookup_free(
+        static_cast<MatrixFormat>(source.index()), dev,
+        get_numeric_type(source), get_index_type(source));
+    fn(source);
+}
+
+void copy_sparse_storage(dim<2> size, Device source_dev, Device target_dev,
+                         SparseStorage& source, SparseStorage& target) {
+    auto fn = dispatch::Sparse::get().lookup_copy(
+        static_cast<MatrixFormat>(source.index()),
+        static_cast<MatrixFormat>(target.index()), source_dev, target_dev,
+        get_numeric_type(source), get_numeric_type(target),
+        get_index_type(source), get_index_type(target));
+    fn(size, source, target);
+}
+
+}  // namespace detail
+
 }  // namespace RandLAPACK
