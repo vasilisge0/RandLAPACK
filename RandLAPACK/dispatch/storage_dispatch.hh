@@ -30,6 +30,36 @@ static void fill(std::array<Fn, N>& table,
     for (auto [idx, fn] : entries) table[idx] = fn;
 }
 
+// Mixed-radix encoder using Horner's method.
+// Usage: encode(v0, d1, v1, d2, v2, ..., dn, vn)
+// where v0..vn are dimension values and d1..dn are the sizes of each
+// subsequent dimension.
+static constexpr std::size_t encode(std::size_t acc) { return acc; }
+
+template <typename T, typename... Rest>
+static constexpr std::size_t encode(std::size_t acc, std::size_t dim, T next,
+                                    Rest... rest) {
+    return encode(acc * dim + static_cast<std::size_t>(next), rest...);
+}
+
+// Dense dispatch struct. This struct contains function pointer tables for
+// Dense matrices.
+//
+// Every function that can be dispatched on Dense matrices
+// should have the following private members:
+// 1) A function pointer type defined above (e.g., initialize_dense_fn)
+// 2) A fill_table function (e.g., fill_initialize_table) that fills the
+// functions into the appropriate locations in the table. The fill function
+// should be called in the constructor of the dispatch struct.
+// 3) An encode function that encodes the input parameters into a unique index
+// for the function pointer table.
+//
+// It also contains the following public members:
+// 1) A get() function that returns a reference to the singleton instance of the
+// dispatch struct.
+// 2) A lookup function for each function pointer table (e.g.,
+// lookup_initialize) that returns the appropriate function pointer based on the
+// input parameters.
 struct Dense {
 public:
     static const Dense& get() {
@@ -66,6 +96,47 @@ public:
 
 private:
     Dense() {
+        fill_initialize_table();
+
+        fill_free_table();
+
+        fill_copy_table();
+    }
+
+    // Number of parameters for dense storage. Those are used to compute the
+    // size of function tables.
+    static constexpr std::size_t num_formats_ =
+        static_cast<std::size_t>(DenseFormat::Count);
+    static constexpr std::size_t num_devices_ =
+        static_cast<std::size_t>(Device::Count);
+    static constexpr std::size_t num_numeric_types_ =
+        static_cast<std::size_t>(NumericType::Count);
+    static constexpr std::size_t num_init_free_elems_ =
+        num_formats_ * num_devices_ * num_numeric_types_;
+    static constexpr std::size_t num_copy_elems_ =
+        num_formats_ * num_formats_ * num_devices_ * num_devices_ *
+        num_numeric_types_ * num_numeric_types_;
+
+    static constexpr std::size_t encode_init_free(MatrixFormat format,
+                                                  Device dev,
+                                                  NumericType numeric_type) {
+        return encode(static_cast<std::size_t>(format), num_devices_, dev,
+                      num_numeric_types_, numeric_type);
+    }
+
+    static constexpr std::size_t encode_copy(MatrixFormat source_format,
+                                             MatrixFormat target_format,
+                                             Device source_dev,
+                                             Device target_dev,
+                                             NumericType source_type,
+                                             NumericType target_type) {
+        return encode(static_cast<std::size_t>(source_format), num_formats_,
+                      target_format, num_devices_, source_dev, num_devices_,
+                      target_dev, num_numeric_types_, source_type,
+                      num_numeric_types_, target_type);
+    }
+
+    void fill_initialize_table() {
         fill(initialize_table_,
              {
                  {encode_init_free(MatrixFormat::STRIDED, Device::CPU,
@@ -87,7 +158,9 @@ private:
                                    NumericType::FP16),
                   &initialize_strided_storage<Device::CUDA, half>},
              });
+    }
 
+    void fill_free_table() {
         fill(free_table_,
              {
                  {encode_init_free(MatrixFormat::STRIDED, Device::CPU,
@@ -109,7 +182,9 @@ private:
                                    NumericType::FP16),
                   &free_strided_storage<Device::CUDA, half>},
              });
+    }
 
+    void fill_copy_table() {
         fill(
             copy_table_,
             {
@@ -153,45 +228,6 @@ private:
                              NumericType::FP16),
                  &copy_strided_storage<Device::CPU, Device::CPU, half, half>},
             });
-    }
-
-    static constexpr std::size_t num_formats_ =
-        static_cast<std::size_t>(DenseFormat::Count);
-    static constexpr std::size_t num_devices_ =
-        static_cast<std::size_t>(Device::Count);
-    static constexpr std::size_t num_numeric_types_ =
-        static_cast<std::size_t>(NumericType::Count);
-    static constexpr std::size_t num_init_free_elems_ =
-        num_formats_ * num_devices_ * num_numeric_types_;
-    static constexpr std::size_t num_copy_elems_ =
-        num_formats_ * num_formats_ * num_devices_ * num_devices_ *
-        num_numeric_types_ * num_numeric_types_;
-
-    static constexpr std::size_t encode_init_free(MatrixFormat format,
-                                                  Device dev,
-                                                  NumericType numeric_type) {
-        return (static_cast<std::size_t>(format)) * num_devices_ *
-                   num_numeric_types_ +
-               (static_cast<std::size_t>(dev)) * num_numeric_types_ +
-               static_cast<std::size_t>(numeric_type);
-    }
-
-    static constexpr std::size_t encode_copy(MatrixFormat source_format,
-                                             MatrixFormat target_format,
-                                             Device source_dev,
-                                             Device target_dev,
-                                             NumericType source_type,
-                                             NumericType target_type) {
-        return (static_cast<std::size_t>(source_format)) * num_devices_ *
-                   num_devices_ * num_numeric_types_ * num_numeric_types_ +
-               (static_cast<std::size_t>(target_format)) * num_devices_ *
-                   num_numeric_types_ * num_numeric_types_ +
-               (static_cast<std::size_t>(source_dev)) * num_numeric_types_ *
-                   num_numeric_types_ +
-               (static_cast<std::size_t>(target_dev)) * num_numeric_types_ *
-                   num_numeric_types_ +
-               (static_cast<std::size_t>(source_type)) * num_numeric_types_ +
-               static_cast<std::size_t>(target_type);
     }
 
     std::array<initialize_dense_fn, num_init_free_elems_> initialize_table_{};
@@ -352,12 +388,9 @@ private:
                                                   Device dev,
                                                   NumericType numeric_type,
                                                   IntType index_type) {
-        return (static_cast<std::size_t>(format)) * num_devices_ *
-                   num_numeric_types_ * num_index_types_ +
-               (static_cast<std::size_t>(dev)) * num_numeric_types_ *
-                   num_index_types_ +
-               (static_cast<std::size_t>(numeric_type)) * num_index_types_ +
-               static_cast<std::size_t>(index_type);
+        return encode(static_cast<std::size_t>(format), num_devices_, dev,
+                      num_numeric_types_, numeric_type, num_index_types_,
+                      index_type);
     }
 
     static constexpr std::size_t encode_copy(
@@ -365,23 +398,12 @@ private:
         Device source_dev, Device target_dev, NumericType source_numeric_type,
         NumericType target_numeric_type, IntType source_index_type,
         IntType target_index_type) {
-        return (static_cast<std::size_t>(source_format)) * num_devices_ *
-                   num_devices_ * num_numeric_types_ * num_numeric_types_ *
-                   num_index_types_ * num_index_types_ +
-               (static_cast<std::size_t>(target_format)) * num_devices_ *
-                   num_numeric_types_ * num_numeric_types_ * num_index_types_ *
-                   num_index_types_ +
-               (static_cast<std::size_t>(source_dev)) * num_numeric_types_ *
-                   num_numeric_types_ * num_index_types_ * num_index_types_ +
-               (static_cast<std::size_t>(target_dev)) * num_numeric_types_ *
-                   num_numeric_types_ * num_index_types_ * num_index_types_ +
-               (static_cast<std::size_t>(source_numeric_type)) *
-                   num_numeric_types_ * num_index_types_ * num_index_types_ +
-               (static_cast<std::size_t>(target_numeric_type)) *
-                   num_index_types_ * num_index_types_ +
-               (static_cast<std::size_t>(source_index_type)) *
-                   num_index_types_ +
-               static_cast<std::size_t>(target_index_type);
+        return encode(static_cast<std::size_t>(source_format),
+                      num_format_types_, target_format, num_devices_,
+                      source_dev, num_devices_, target_dev, num_numeric_types_,
+                      source_numeric_type, num_numeric_types_,
+                      target_numeric_type, num_index_types_, source_index_type,
+                      num_index_types_, target_index_type);
     }
 
     std::array<initialize_sparse_fn, num_init_free_elems_> initialize_table_{};
