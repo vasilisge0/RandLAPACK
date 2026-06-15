@@ -17,6 +17,16 @@ struct dim<2> {
         ncols = nc;
     }
 
+    dim(int32_t nr, int32_t nc) {
+        nrows = static_cast<int32_t>(nr);
+        ncols = static_cast<int32_t>(nc);
+    }
+
+    dim(int64_t nr, int64_t nc) {
+        nrows = static_cast<size_t>(nr);
+        ncols = static_cast<size_t>(nc);
+    }
+
     size_t operator[](size_t idx) {
         switch (idx) {
             case 0:

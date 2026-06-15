@@ -1,5 +1,6 @@
 #pragma once
 
+#include "csr_storage.hh"
 #include "dimensions.hh"
 #include "memory.hh"
 

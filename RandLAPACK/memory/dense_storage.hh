@@ -1,5 +1,6 @@
 #pragma once
 #include "device.hh"
+#include "dimensions.hh"
 #include "memory.hh"
 #include "precision.hh"
 #include "storage_cpu_kernels.hh"

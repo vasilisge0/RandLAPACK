@@ -4,6 +4,7 @@
 #include <memory>
 #include <variant>
 
+#include "context.hh"
 #include "csr_storage.hh"
 #include "dense_storage.hh"
 #include "device.hh"
@@ -24,16 +25,18 @@ struct StridedDescriptor {
     size_t lead_dim_ = 0;
     Layout layout_ = Layout::COL_MAJOR;
     NumericType store_type_;
+
     StridedDescriptor() = delete;
-    StridedDescriptor(size_t lead_dim, Layout layout, NumericType store_type)
+    StridedDescriptor(Layout layout, NumericType store_type, size_t lead_dim)
         : lead_dim_(lead_dim), layout_(layout), store_type_(store_type) {}
-};  // StridedDescriptor
+};
 
 struct CsrDescriptor {
     dim<2> size_ = {0, 0};
     size_t nnz_ = 0;
     NumericType store_type_;
     IntType index_type_;
+
     CsrDescriptor() = delete;
     CsrDescriptor(size_t nnz, NumericType store_type, IntType index_type)
         : index_type_(index_type), nnz_(nnz), store_type_(store_type) {}
@@ -140,229 +143,313 @@ void copy_sparse_storage(dim<2> size, Device source_dev, Device target_dev,
 
 }  // namespace detail
 
-// Forward declaration of matrix views
+struct Dense;
+
+// View objects used to access dense matrices without copying data. These are
+// used as arguments to kernels, and are constructed from Dense objects. They do
+// not own any data, and are not responsible for deallocating any data.
 
 template <typename value_t>
-struct StridedView;
-
-struct CsrView;
-
-struct DenseState {
-   public:
-    RandLAPACK::Device device_;
-    RandLAPACK::DenseStorage storage_;
-
-    size_t num_elems_ = 0;
+struct StridedView {
+    Device device_;
     dim<2> size_ = {0, 0};
+    size_t lead_dim_ = 0;
+    size_t num_elems_ = 0;
+    Layout layout_ = Layout::COL_MAJOR;
+    value_t* values_ = nullptr;
 
-    DenseState() = default;
-
-    DenseState(dim<2> size, Layout layout, Device device,
-               NumericType store_precision)
-        : device_(device), storage_(StridedStorage(size, size[0], layout)) {
-        detail::initialize_dense_storage(size, device_, storage_);
+    StridedView(RandLAPACK::Dense& source) {
+        StridedStorage storage = std::get<StridedStorage>(source.storage_);
+        value_t* values = std::get<value_t*>(storage.values_);
+        size_ = storage.size_;
+        lead_dim_ = storage.lead_dim_;
+        layout_ = storage.layout_;
+        values_ = values;
+        device_ = source.device_;
+        num_elems_ = storage.num_elems_;
     }
+};
 
-    DenseState(MatrixDescriptor descriptor, Device device) {
-        device_ = device;
-        size_ = descriptor.get_size();
-        if (descriptor.get_format() == MatrixFormat::STRIDED) {
-            StridedDescriptor dense_descr =
-                std::get<StridedDescriptor>(descriptor.storage_descriptor_);
-            storage_ = StridedStorage(size_, dense_descr.lead_dim_,
-                                      dense_descr.layout_);
-            detail::initialize_dense_storage(size_, device_, storage_);
+// Matrix objects that own memory.
+
+struct Dense {
+    template <typename value_t>
+    friend struct StridedView;
+
+private:
+    Device device_;
+    DenseStorage storage_;
+
+protected:
+    Dense(Context& context, MatrixFormat matrix_type, NumericType store_type,
+          Layout layout, dim<2> size, size_t lead_dim) {
+        if (matrix_type == MatrixFormat::STRIDED) {
+            storage_ = StridedStorage(store_type, layout, size, lead_dim);
+        } else {
+            throw std::invalid_argument("Unsupported matrix type.");
         }
+        device_ = context.get_device();
+        detail::initialize_dense_storage(size, context.get_device(), storage_);
     }
 
-    ~DenseState() { detail::free_dense_storage(device_, storage_); }
+    Dense(Context& context, NumericType store_type, std::string& filename) {}
 
-    void copy_from(DenseState& source) {
-        if (storage_.index() != source.storage_.index())
+    Dense(Context& context, MatrixDescriptor descriptor) {}
+
+public:
+    static std::unique_ptr<Dense> create_strided(Context& context,
+                                                 Layout layout,
+                                                 NumericType store_precision,
+                                                 dim<2> size) {
+        Dense* tmp = new Dense(context, MatrixFormat::STRIDED, store_precision,
+                               layout, size, size[0]);
+        return std::unique_ptr<Dense>(tmp);
+    }
+
+    static std::unique_ptr<Dense> create_strided(Context& context,
+                                                 Layout layout,
+                                                 NumericType store_precision,
+                                                 dim<2> size, size_t lead_dim) {
+        Dense* tmp = new Dense(context, MatrixFormat::STRIDED, store_precision,
+                               layout, size, lead_dim);
+        return std::unique_ptr<Dense>(tmp);
+    }
+
+    static std::unique_ptr<Dense> create_strided(Context& context,
+                                                 Layout layout,
+                                                 NumericType store_precision,
+                                                 std::string& filename) {
+        Dense* tmp = new Dense(context, store_precision, filename);
+        return std::unique_ptr<Dense>(tmp);
+    }
+
+    static std::unique_ptr<Dense> create(Context& context,
+                                         MatrixDescriptor descriptor) {
+        Dense* tmp = new Dense(context, descriptor);
+        return std::unique_ptr<Dense>(tmp);
+    }
+
+    static std::unique_ptr<Dense> create_from(Context& context, Dense& source) {
+        std::unique_ptr<Dense> target =
+            create(context, source.get_descriptor());
+        target->copy_from(source);
+        return target;
+    }
+
+    static std::unique_ptr<Dense> create_from(Dense& source) {
+        Context context = Context(source.get_device());
+        std::unique_ptr<Dense> target =
+            create(context, source.get_descriptor());
+        target->copy_from(source);
+        return target;
+    }
+
+    void copy_from(Dense& source) {
+        if (get_format() != source.get_format())
             throw std::invalid_argument(
                 "Copying values from matrices of different types");
-        if (size_ != source.size_)
+
+        dim<2> size = get_size();
+        if (size != source.get_size())
             throw std::invalid_argument(
                 "Copying from matrix of incompatible size.");
-        detail::copy_dense_storage(size_, source.device_, device_,
+
+        detail::copy_dense_storage(size, source.device_, device_,
                                    source.storage_, storage_);
     }
-};  // DenseState
 
-struct SparseState {
-   public:
-    RandLAPACK::Device device_;
-    RandLAPACK::SparseStorage storage_;
-
-    SparseState() = default;
-
-    SparseState(dim<2> size, size_t nnz, Device device,
-                NumericType store_precision, IntType index_type)
-        : device_(device) {
-        storage_ = CsrStorage(size, nnz, store_precision, index_type);
-        detail::initialize_sparse_storage(device_, storage_);
-    }  // SparseState
-
-    SparseState(MatrixDescriptor descriptor, Device device) {
-        device_ = device;
-        if (descriptor.get_format() == MatrixFormat::CSR) {
-            CsrDescriptor sparse_descr =
-                std::get<CsrDescriptor>(descriptor.storage_descriptor_);
-            storage_ =
-                CsrStorage(sparse_descr.size_, sparse_descr.nnz_,
-                           sparse_descr.store_type_, sparse_descr.index_type_);
-            detail::initialize_sparse_storage(device_, storage_);
-        }
-    }  // SparseState
-
-    ~SparseState() {
-        detail::free_sparse_storage(device_, storage_);
-    }  // ~SparseState
+    MatrixDescriptor get_descriptor() const {
+        NumericType data_type = get_value_type();
+        return std::visit(
+            [data_type](auto&& arg) -> MatrixDescriptor {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, StridedStorage>) {
+                    return MatrixDescriptor(StridedDescriptor(
+                        arg.layout_, data_type, arg.lead_dim_));
+                } else {
+                    throw std::invalid_argument("Unsupported matrix format.");
+                }
+            },
+            storage_);
+    }
 
     dim<2> get_size() const {
         return std::visit([](auto&& arg) -> dim<2> { return arg.size_; },
                           storage_);
     };
 
-    void copy_from(SparseState& source) {
-        if (storage_.index() != source.storage_.index())
+    MatrixFormat get_format() const {
+        return static_cast<MatrixFormat>(storage_.index());
+    }
+
+    Device get_device() const { return device_; }
+
+    NumericType get_value_type() const {
+        return std::visit(
+            [](auto&& arg) -> NumericType {
+                return std::visit(
+                    [](auto&& subarg) -> NumericType {
+                        return numeric_type_of<std::remove_pointer_t<
+                            std::decay_t<decltype(subarg)>>>;
+                    },
+                    arg.values_);
+            },
+            storage_);
+    }
+
+    ~Dense() { detail::free_dense_storage(device_, storage_); }
+};
+
+template <typename value_t>
+StridedView<value_t> as_strided_view(Dense& source) {
+    StridedStorage storage = std::get<StridedStorage>(source.storage_);
+    return StridedView<value_t>{
+        source.device_,    storage.size_,
+        storage.lead_dim_, storage.num_elems_,
+        storage.layout_,   std::get<value_t*>(storage.values_)};
+}
+
+struct Sparse {
+    template <typename value_t, typename index_t>
+    friend class CsrView;
+
+private:
+    Device device_;
+    SparseStorage storage_;
+
+protected:
+    Sparse(Context& context, MatrixDescriptor descriptor) {
+        device_ = context.get_device();
+        std::visit(
+            [this](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, CsrDescriptor>) {
+                    storage_ = CsrStorage(arg.store_type_, arg.index_type_,
+                                          arg.size_, arg.nnz_);
+                } else {
+                    throw std::invalid_argument("Unsupported matrix format.");
+                }
+            },
+            descriptor.storage_descriptor_);
+    }
+
+public:
+    static std::unique_ptr<Sparse> create_csr(Context& context,
+                                              NumericType value_type,
+                                              IntType index_type, dim<2> size,
+                                              size_t nnz) {
+        Sparse* tmp = new Sparse(context, MatrixDescriptor(CsrDescriptor(
+                                              nnz, value_type, index_type)));
+        return std::unique_ptr<Sparse>(tmp);
+    }
+
+    static std::unique_ptr<Sparse> create(Context& context,
+                                          MatrixDescriptor descriptor) {
+        Sparse* tmp = new Sparse(context, descriptor);
+        return std::unique_ptr<Sparse>(tmp);
+    }
+
+    static std::unique_ptr<Sparse> create_from(Context& context,
+                                               Sparse& source) {
+        std::unique_ptr<Sparse> target =
+            create(context, source.get_descriptor());
+        target->copy_from(source);
+        return target;
+    }
+
+    void copy_from(Sparse& source) {
+        if (get_format() != source.get_format())
             throw std::invalid_argument(
                 "Copying values from matrices of different types");
-        dim<2> size = std::visit([](auto&& arg) -> dim<2> { return arg.size_; },
-                                 storage_);
+
+        dim<2> size = get_size();
         if (size != source.get_size())
             throw std::invalid_argument(
                 "Copying from matrix of incompatible size.");
+
         detail::copy_sparse_storage(size, source.device_, device_,
                                     source.storage_, storage_);
     }
-};  // SparseState
-
-// Dense/Sparse matrix interfaces
-
-struct Dense {
-    template <typename value_t>
-    friend struct RandLAPACK::StridedView;
-
-   public:
-    static std::unique_ptr<Dense> create_strided(dim<2> size,
-                                                 RandLAPACK::Layout layout,
-                                                 Device device,
-                                                 NumericType store_precision) {
-        Dense* tmp = new Dense(size, layout, device, store_precision);
-        return std::unique_ptr<Dense>(tmp);
-    }
-
-    static std::unique_ptr<Dense> create_strided(std::string& filename,
-                                                 RandLAPACK::Layout layout,
-                                                 Device device,
-                                                 NumericType store_precision) {}
-
-    static std::unique_ptr<Dense> create(MatrixDescriptor descriptor,
-                                         Device device) {
-        Dense* tmp = new Dense(descriptor, device);
-        return std::unique_ptr<Dense>(tmp);
-    }
-
-    static std::unique_ptr<Dense> create_from(Dense& source) {
-        std::unique_ptr<Dense> target =
-            create(source.get_descriptor(), source.state_.device_);
-        target->copy_from(source);
-        return target;
-    }
-
-    static std::unique_ptr<Dense> create_from(Device target_device,
-                                              Dense& source) {
-        MatrixDescriptor descriptor = source.get_descriptor();
-        std::unique_ptr<Dense> target =
-            Dense::create(descriptor, target_device);
-        target->copy_from(source);
-        return target;
-    }
-
-    void copy_from(Dense& source) { state_.copy_from(source.state_); }
-
-    dim<2> get_size() const { return state_.size_; };
 
     MatrixDescriptor get_descriptor() const {
-        if (state_.storage_.index() ==
-            static_cast<std::size_t>(MatrixFormat::STRIDED)) {
-            StridedStorage S =
-                std::get<RandLAPACK::StridedStorage>(state_.storage_);
-            return MatrixDescriptor(
-                StridedDescriptor(S.lead_dim_, S.layout_,
-                                  static_cast<NumericType>(S.values_.index())));
-
-        } else {
-            throw std::runtime_error("Invalid storage type for dense matrix.");
-        }
-    }  // get_descriptor
-
-    DenseFormat get_format() const {
-        return static_cast<DenseFormat>(state_.storage_.index());
+        NumericType value_type = get_value_type();
+        IntType index_type = get_index_type();
+        return std::visit(
+            [value_type, index_type](auto&& arg) -> MatrixDescriptor {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, CsrStorage>) {
+                    return MatrixDescriptor(
+                        CsrDescriptor(arg.nnz_, value_type, index_type));
+                } else {
+                    throw std::invalid_argument("Unsupported matrix format.");
+                }
+            },
+            storage_);
     }
 
-    Device get_device() const { return state_.device_; }
-
-   protected:
-    Dense(dim<2> size, RandLAPACK::Layout layout, Device device,
-          NumericType compute_precision)
-        : state_(size, layout, device, compute_precision) {}
-
-    Dense(std::string& filename, Device device, NumericType compute_precision) {
+    dim<2> get_size() const {
+        return std::visit([](auto&& arg) -> dim<2> { return arg.size_; },
+                          storage_);
     }
 
-    Dense(MatrixDescriptor descriptor, Device device)
-        : state_(descriptor, device) {}
+    MatrixFormat get_format() const {
+        return static_cast<MatrixFormat>(storage_.index());
+    }
 
-   private:
-    DenseState state_;
-};  // Dense
+    Device get_device() const { return device_; }
 
-struct Sparse {
-    friend class CsrView;
+    NumericType get_value_type() const {
+        return std::visit(
+            [](auto&& arg) -> NumericType {
+                return std::visit(
+                    [](auto&& subarg) -> NumericType {
+                        return numeric_type_of<std::remove_pointer_t<
+                            std::decay_t<decltype(subarg)>>>;
+                    },
+                    arg.values_);
+            },
+            storage_);
+    }
 
-   private:
-    SparseState state_;
-};  // Sparse
+    IntType get_index_type() const {
+        return std::visit(
+            [](auto&& arg) -> IntType {
+                return static_cast<IntType>(arg.row_ptrs_.index());
+            },
+            storage_);
+    }
 
-// View objects for dynamic dispatch of the correct apply call in
-// sketch_general. A view object will perform a shallow copy of the relevant
-// metadata and data pointers from the Matrix object, and this view object will
-// be passed to the apply call in sketch_general.
+    ~Sparse() { detail::free_sparse_storage(device_, storage_); }
+};
 
-template <typename value_t>
-struct StridedView {
-    dim<2> size_;
-    Layout layout_ = RandLAPACK::Layout::COL_MAJOR;
-    value_t* values_;
-    Device device_;
-    size_t lead_dim_ = 0;
-    StridedView(Dense& source)
-        : size_(source.state_.size_),
-          lead_dim_(std::get<StridedStorage>(source.state_.storage_).lead_dim_),
-          layout_(std::get<StridedStorage>(source.state_.storage_).layout_),
-          values_(std::get<value_t*>(
-              std::get<StridedStorage>(source.state_.storage_).values_)),
-          device_(source.state_.device_) {}
-};  // StridedView
-
-template struct StridedView<double>;
-template struct StridedView<float>;
-template struct StridedView<half>;
-
+template <typename value_t, typename index_t>
 struct CsrView {
-    // dim<2> size_;
-    // NumericPtrVariant values_;
-    // Device device_;
-    // size_t nnz_ = 0;
-    CsrView(RandLAPACK::Sparse& source) {}
-    // : size_(source.state_.size_),
-    // nnz_(std::get<CsrStorage>(source.state_.storage_).nnz_),
-    //   values_(std::get<CsrStorage>(source.state_.storage_).values_),
-    //   device_(source.state_.device_) {}
-};  // CsrView
+    Device device_;
+    dim<2> size_;
+    size_t nnz_;
+    NumericPtrVariant values_;
+    IntPtrVariant row_ptrs_;
+    IntPtrVariant col_idxs_;
 
-using Matrix = std::variant<std::unique_ptr<Dense>, std::unique_ptr<Sparse>>;
+    CsrView(Sparse& source) {
+        CsrStorage storage = std::get<CsrStorage>(source.storage_);
+        values_ = std::get<value_t*>(storage.values_);
+        row_ptrs_ = std::get<index_t*>(storage.row_ptrs_);
+        col_idxs_ = std::get<index_t*>(storage.col_idxs_);
+        size_ = storage.size_;
+        nnz_ = storage.nnz_;
+        device_ = source.device_;
+    }
+};
+
+template <typename value_t, typename index_t>
+CsrView<value_t, index_t> as_csr_view(Sparse& source) {
+    CsrStorage storage = std::get<CsrStorage>(source.storage_);
+    return CsrView<value_t, index_t>{source.device_,    storage.size_,
+                                     storage.nnz_,      storage.values_,
+                                     storage.row_ptrs_, storage.col_idxs_};
+}
+
+using Matrix = std::variant<Dense, Sparse>;
 
 }  // namespace RandLAPACK

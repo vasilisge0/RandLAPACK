@@ -10,6 +10,9 @@
 #include "precision.hh"
 
 namespace RandLAPACK {
+
+using all_devices = vlist<Device::CPU, Device::CUDA>;
+
 namespace dispatch {
 
 using initialize_dense_fn = void (*)(dim<2> size, DenseStorage& source);

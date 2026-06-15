@@ -33,6 +33,9 @@ struct to_enum_numeric_type<half> {
     static constexpr NumericType value = NumericType::FP16;
 };
 
+template <typename T>
+constexpr NumericType numeric_type_of = to_enum_numeric_type<T>::value;
+
 template <NumericType N>
 struct to_concrete_numeric_type;
 
@@ -72,8 +75,7 @@ void for_each(vlist<Vs...>, F&& f) {
     (f.template operator()<Vs>(), ...);
 }
 
-// Lists of all devices, numeric types, and integer types for iteration.
-using all_devices = vlist<Device::CPU, Device::CUDA>;
+// Lists of all numeric types and integer types for iteration.
 using all_numerics =
     vlist<NumericType::FP64, NumericType::FP32, NumericType::FP16>;
 using all_ints = vlist<IntType::INT64, IntType::INT32>;

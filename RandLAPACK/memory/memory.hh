@@ -66,16 +66,19 @@ template Status free<Device::CUDA, int>(int* values);
 
 struct StridedStorage {
     dim<2> size_ = {0, 0};
-    NumericPtrVariant values_;
-    Layout layout_ = RandLAPACK::Layout::COL_MAJOR;
     size_t lead_dim_ = 0;
+    size_t num_elems_ = 0;
+    Layout layout_ = Layout::COL_MAJOR;
+    NumericPtrVariant values_;
+
     StridedStorage() = default;
-    StridedStorage(dim<2> size, size_t lead_dim, Layout layout)
+    StridedStorage(NumericType store_type, Layout layout, dim<2> size,
+                   size_t lead_dim)
         : size_{size}, lead_dim_{lead_dim}, layout_{layout} {}
-    StridedStorage(dim<2> size, size_t lead_dim, Layout layout,
+    StridedStorage(Layout layout, dim<2> size, size_t lead_dim,
                    NumericPtrVariant values)
         : size_{size}, lead_dim_{lead_dim}, layout_{layout}, values_{values} {}
-};  // struct StridedStorage
+};
 
 struct CsrStorage {
     dim<2> size_ = {0, 0};
@@ -83,18 +86,19 @@ struct CsrStorage {
     NumericPtrVariant values_;
     IntPtrVariant row_ptrs_;
     IntPtrVariant col_idxs_;
+
     CsrStorage() = default;
-    CsrStorage(dim<2> size, size_t nnz, NumericType value_type,
-               IntType index_type)
+    CsrStorage(NumericType value_type, IntType index_type, dim<2> size,
+               size_t nnz)
         : size_{size}, nnz_{nnz} {}
     CsrStorage(dim<2> size, size_t nnz, NumericPtrVariant values,
-               IntPtrVariant row_ptrs, IntPtrVariant col_idxs, IntType)
+               IntPtrVariant row_ptrs, IntPtrVariant col_idxs)
         : size_{size},
           nnz_{nnz},
           values_{values},
           row_ptrs_{row_ptrs},
           col_idxs_{col_idxs} {}
-};  // struct CsrStorage
+};
 
 enum class DenseFormat : std::size_t { STRIDED = 0, Count };
 enum class SparseFormat : std::size_t { CSR = 1, Count };
