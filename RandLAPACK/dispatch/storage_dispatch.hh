@@ -1,8 +1,6 @@
 #pragma once
 
 #include <array>
-#include <initializer_list>
-#include <utility>
 
 #include "csr_storage.hh"
 #include "dense_storage.hh"
@@ -22,13 +20,6 @@ using initialize_sparse_fn = void (*)(dim<2> size, SparseStorage& source);
 using free_sparse_fn = void (*)(SparseStorage& source);
 using copy_sparse_fn = void (*)(dim<2> size, SparseStorage& source,
                                 SparseStorage& target);
-
-template <typename Fn, std::size_t N>
-static void fill(std::array<Fn, N>& table,
-                 std::initializer_list<std::pair<std::size_t, Fn>> entries) {
-    table.fill(nullptr);
-    for (auto [idx, fn] : entries) table[idx] = fn;
-}
 
 // Mixed-radix encoder using Horner's method.
 // Usage: encode(v0, d1, v1, d2, v2, ..., dn, vn)
@@ -97,14 +88,10 @@ public:
 private:
     Dense() {
         fill_initialize_table();
-
         fill_free_table();
-
         fill_copy_table();
     }
 
-    // Number of parameters for dense storage. Those are used to compute the
-    // size of function tables.
     static constexpr std::size_t num_formats_ =
         static_cast<std::size_t>(DenseFormat::Count);
     static constexpr std::size_t num_devices_ =
@@ -137,97 +124,47 @@ private:
     }
 
     void fill_initialize_table() {
-        fill(initialize_table_,
-             {
-                 {encode_init_free(MatrixFormat::STRIDED, Device::CPU,
-                                   NumericType::FP64),
-                  &initialize_strided_storage<Device::CPU, double>},
-                 {encode_init_free(MatrixFormat::STRIDED, Device::CPU,
-                                   NumericType::FP32),
-                  &initialize_strided_storage<Device::CPU, float>},
-                 {encode_init_free(MatrixFormat::STRIDED, Device::CPU,
-                                   NumericType::FP16),
-                  &initialize_strided_storage<Device::CPU, half>},
-                 {encode_init_free(MatrixFormat::STRIDED, Device::CUDA,
-                                   NumericType::FP64),
-                  &initialize_strided_storage<Device::CUDA, double>},
-                 {encode_init_free(MatrixFormat::STRIDED, Device::CUDA,
-                                   NumericType::FP32),
-                  &initialize_strided_storage<Device::CUDA, float>},
-                 {encode_init_free(MatrixFormat::STRIDED, Device::CUDA,
-                                   NumericType::FP16),
-                  &initialize_strided_storage<Device::CUDA, half>},
-             });
+        initialize_table_.fill(nullptr);
+        for_each(all_devices{}, [&]<Device Dev>() {
+            for_each(all_numerics{}, [&]<NumericType Nt>() {
+                using T = typename to_concrete_numeric_type<Nt>::value;
+                initialize_table_[encode_init_free(MatrixFormat::STRIDED, Dev,
+                                                   Nt)] =
+                    &initialize_strided_storage<Dev, T>;
+            });
+        });
     }
 
     void fill_free_table() {
-        fill(free_table_,
-             {
-                 {encode_init_free(MatrixFormat::STRIDED, Device::CPU,
-                                   NumericType::FP64),
-                  &free_strided_storage<Device::CPU, double>},
-                 {encode_init_free(MatrixFormat::STRIDED, Device::CPU,
-                                   NumericType::FP32),
-                  &free_strided_storage<Device::CPU, float>},
-                 {encode_init_free(MatrixFormat::STRIDED, Device::CPU,
-                                   NumericType::FP16),
-                  &free_strided_storage<Device::CPU, half>},
-                 {encode_init_free(MatrixFormat::STRIDED, Device::CUDA,
-                                   NumericType::FP64),
-                  &free_strided_storage<Device::CUDA, double>},
-                 {encode_init_free(MatrixFormat::STRIDED, Device::CUDA,
-                                   NumericType::FP32),
-                  &free_strided_storage<Device::CUDA, float>},
-                 {encode_init_free(MatrixFormat::STRIDED, Device::CUDA,
-                                   NumericType::FP16),
-                  &free_strided_storage<Device::CUDA, half>},
-             });
+        free_table_.fill(nullptr);
+        for_each(all_devices{}, [&]<Device Dev>() {
+            for_each(all_numerics{}, [&]<NumericType Nt>() {
+                using T = typename to_concrete_numeric_type<Nt>::value;
+                free_table_[encode_init_free(MatrixFormat::STRIDED, Dev, Nt)] =
+                    &free_strided_storage<Dev, T>;
+            });
+        });
     }
 
     void fill_copy_table() {
-        fill(
-            copy_table_,
-            {
-                {encode_copy(MatrixFormat::STRIDED, MatrixFormat::STRIDED,
-                             Device::CPU, Device::CPU, NumericType::FP64,
-                             NumericType::FP64),
-                 &copy_strided_storage<Device::CPU, Device::CPU, double,
-                                       double>},
-                {encode_copy(MatrixFormat::STRIDED, MatrixFormat::STRIDED,
-                             Device::CPU, Device::CPU, NumericType::FP64,
-                             NumericType::FP64),
-                 &copy_strided_storage<Device::CPU, Device::CPU, double,
-                                       float>},
-                {encode_copy(MatrixFormat::STRIDED, MatrixFormat::STRIDED,
-                             Device::CPU, Device::CPU, NumericType::FP64,
-                             NumericType::FP64),
-                 &copy_strided_storage<Device::CPU, Device::CPU, double, half>},
-                {encode_copy(MatrixFormat::STRIDED, MatrixFormat::STRIDED,
-                             Device::CPU, Device::CPU, NumericType::FP32,
-                             NumericType::FP64),
-                 &copy_strided_storage<Device::CPU, Device::CPU, float,
-                                       double>},
-                {encode_copy(MatrixFormat::STRIDED, MatrixFormat::STRIDED,
-                             Device::CPU, Device::CPU, NumericType::FP32,
-                             NumericType::FP32),
-                 &copy_strided_storage<Device::CPU, Device::CPU, float, float>},
-                {encode_copy(MatrixFormat::STRIDED, MatrixFormat::STRIDED,
-                             Device::CPU, Device::CPU, NumericType::FP32,
-                             NumericType::FP32),
-                 &copy_strided_storage<Device::CPU, Device::CPU, float, half>},
-                {encode_copy(MatrixFormat::STRIDED, MatrixFormat::STRIDED,
-                             Device::CPU, Device::CPU, NumericType::FP16,
-                             NumericType::FP16),
-                 &copy_strided_storage<Device::CPU, Device::CPU, half, double>},
-                {encode_copy(MatrixFormat::STRIDED, MatrixFormat::STRIDED,
-                             Device::CPU, Device::CPU, NumericType::FP16,
-                             NumericType::FP16),
-                 &copy_strided_storage<Device::CPU, Device::CPU, half, float>},
-                {encode_copy(MatrixFormat::STRIDED, MatrixFormat::STRIDED,
-                             Device::CPU, Device::CPU, NumericType::FP16,
-                             NumericType::FP16),
-                 &copy_strided_storage<Device::CPU, Device::CPU, half, half>},
+        copy_table_.fill(nullptr);
+        for_each(all_devices{}, [&]<Device SrcDev>() {
+            for_each(all_devices{}, [&]<Device TgtDev>() {
+                for_each(all_numerics{}, [&]<NumericType SrcNt>() {
+                    for_each(all_numerics{}, [&]<NumericType TgtNt>() {
+                        using source_float_t =
+                            typename to_concrete_numeric_type<SrcNt>::value;
+                        using target_float_t =
+                            typename to_concrete_numeric_type<TgtNt>::value;
+                        copy_table_[encode_copy(MatrixFormat::STRIDED,
+                                                MatrixFormat::STRIDED, SrcDev,
+                                                TgtDev, SrcNt, TgtNt)] =
+                            &copy_strided_storage<
+                                SrcDev, TgtDev, source_float_t, target_float_t>;
+                    });
+                });
             });
+        });
     }
 
     std::array<initialize_dense_fn, num_init_free_elems_> initialize_table_{};
@@ -277,95 +214,9 @@ public:
 
 private:
     Sparse() {
-        fill(initialize_table_,
-             {
-                 {encode_init_free(MatrixFormat::CSR, Device::CPU,
-                                   NumericType::FP64, IntType::INT64),
-                  &initialize_csr_storage<Device::CPU, double, int64_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CPU,
-                                   NumericType::FP32, IntType::INT64),
-                  &initialize_csr_storage<Device::CPU, float, int64_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CPU,
-                                   NumericType::FP16, IntType::INT64),
-                  &initialize_csr_storage<Device::CPU, half, int64_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CPU,
-                                   NumericType::FP64, IntType::INT32),
-                  &initialize_csr_storage<Device::CPU, double, int32_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CPU,
-                                   NumericType::FP32, IntType::INT32),
-                  &initialize_csr_storage<Device::CPU, float, int32_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CPU,
-                                   NumericType::FP16, IntType::INT32),
-                  &initialize_csr_storage<Device::CPU, half, int32_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CUDA,
-                                   NumericType::FP64, IntType::INT64),
-                  &initialize_csr_storage<Device::CUDA, double, int64_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CUDA,
-                                   NumericType::FP32, IntType::INT64),
-                  &initialize_csr_storage<Device::CUDA, float, int64_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CUDA,
-                                   NumericType::FP16, IntType::INT64),
-                  &initialize_csr_storage<Device::CUDA, half, int64_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CUDA,
-                                   NumericType::FP64, IntType::INT32),
-                  &initialize_csr_storage<Device::CUDA, double, int32_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CUDA,
-                                   NumericType::FP32, IntType::INT32),
-                  &initialize_csr_storage<Device::CUDA, float, int32_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CUDA,
-                                   NumericType::FP16, IntType::INT32),
-                  &initialize_csr_storage<Device::CUDA, half, int32_t>},
-             });
-
-        fill(free_table_,
-             {
-                 {encode_init_free(MatrixFormat::CSR, Device::CPU,
-                                   NumericType::FP64, IntType::INT64),
-                  &free_csr_storage<Device::CPU, double, int64_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CPU,
-                                   NumericType::FP32, IntType::INT64),
-                  &free_csr_storage<Device::CPU, float, int64_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CPU,
-                                   NumericType::FP16, IntType::INT64),
-                  &free_csr_storage<Device::CPU, half, int64_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CPU,
-                                   NumericType::FP64, IntType::INT32),
-                  &free_csr_storage<Device::CPU, double, int32_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CPU,
-                                   NumericType::FP32, IntType::INT32),
-                  &free_csr_storage<Device::CPU, float, int32_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CPU,
-                                   NumericType::FP16, IntType::INT32),
-                  &free_csr_storage<Device::CPU, half, int32_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CUDA,
-                                   NumericType::FP64, IntType::INT64),
-                  &free_csr_storage<Device::CUDA, double, int64_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CUDA,
-                                   NumericType::FP32, IntType::INT64),
-                  &free_csr_storage<Device::CUDA, float, int64_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CUDA,
-                                   NumericType::FP16, IntType::INT64),
-                  &free_csr_storage<Device::CUDA, half, int64_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CUDA,
-                                   NumericType::FP64, IntType::INT32),
-                  &free_csr_storage<Device::CUDA, double, int32_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CUDA,
-                                   NumericType::FP32, IntType::INT32),
-                  &free_csr_storage<Device::CUDA, float, int32_t>},
-                 {encode_init_free(MatrixFormat::CSR, Device::CUDA,
-                                   NumericType::FP16, IntType::INT32),
-                  &free_csr_storage<Device::CUDA, half, int32_t>},
-             });
-
-        fill(
-            copy_table_,
-            {
-                {encode_copy(MatrixFormat::CSR, MatrixFormat::CSR, Device::CUDA,
-                             Device::CPU, NumericType::FP64, NumericType::FP64,
-                             IntType::INT64, IntType::INT64),
-                 &copy_csr_storage<Device::CUDA, Device::CPU, double, double,
-                                   int64_t, int64_t>},
-            });
+        fill_initialize_table();
+        fill_free_table();
+        fill_copy_table();
     }
 
     static constexpr std::size_t num_devices_ =
@@ -404,6 +255,72 @@ private:
                       source_numeric_type, num_numeric_types_,
                       target_numeric_type, num_index_types_, source_index_type,
                       num_index_types_, target_index_type);
+    }
+
+    void fill_initialize_table() {
+        initialize_table_.fill(nullptr);
+        for_each(all_devices{}, [&]<Device Dev>() {
+            for_each(all_numerics{}, [&]<NumericType Nt>() {
+                for_each(all_ints{}, [&]<IntType It>() {
+                    using T = typename to_concrete_numeric_type<Nt>::value;
+                    using I = typename to_concrete_integer_type<It>::value;
+                    initialize_table_[encode_init_free(MatrixFormat::CSR, Dev,
+                                                       Nt, It)] =
+                        &initialize_csr_storage<Dev, T, I>;
+                });
+            });
+        });
+    }
+
+    void fill_free_table() {
+        free_table_.fill(nullptr);
+        for_each(all_devices{}, [&]<Device Dev>() {
+            for_each(all_numerics{}, [&]<NumericType Nt>() {
+                for_each(all_ints{}, [&]<IntType It>() {
+                    using T = typename to_concrete_numeric_type<Nt>::value;
+                    using I = typename to_concrete_integer_type<It>::value;
+                    free_table_[encode_init_free(MatrixFormat::CSR, Dev, Nt,
+                                                 It)] =
+                        &free_csr_storage<Dev, T, I>;
+                });
+            });
+        });
+    }
+
+    void fill_copy_table() {
+        copy_table_.fill(nullptr);
+        for_each(all_devices{}, [&]<Device SrcDev>() {
+            for_each(all_devices{}, [&]<Device TgtDev>() {
+                for_each(all_numerics{}, [&]<NumericType SrcNt>() {
+                    for_each(all_numerics{}, [&]<NumericType TgtNt>() {
+                        for_each(all_ints{}, [&]<IntType source_int_tt>() {
+                            for_each(all_ints{}, [&]<IntType target_int_tt>() {
+                                // using source_float_t =
+                                //     typename
+                                //     to_concrete_numeric_type<SrcNt>::value;
+                                // using target_float_t =
+                                //     typename
+                                //     to_concrete_numeric_type<TgtNt>::value;
+                                // using source_int_t =
+                                //     typename
+                                //     to_concrete_integer_type<source_int_tt>::value;
+                                // using target_int_t =
+                                //     typename
+                                //     to_concrete_integer_type<target_int_tt>::value;
+                                // copy_table_[encode_copy(
+                                //     MatrixFormat::CSR, MatrixFormat::CSR,
+                                //     SrcDev, TgtDev, SrcNt, TgtNt,
+                                //     source_int_tt, target_int_tt)] =
+                                //     &copy_csr_storage<
+                                //         SrcDev, TgtDev, source_float_t,
+                                //         target_float_t, source_int_t,
+                                //         target_int_t>;
+                            });
+                        });
+                    });
+                });
+            });
+        });
     }
 
     std::array<initialize_sparse_fn, num_init_free_elems_> initialize_table_{};

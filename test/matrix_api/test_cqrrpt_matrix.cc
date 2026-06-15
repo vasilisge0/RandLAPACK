@@ -16,7 +16,7 @@ using Subroutines = RandLAPACK::CQRRPTSubroutines;
 using namespace RandLAPACK;
 
 class TestCQRRPTMatrix : public ::testing::Test {
-   protected:
+protected:
     virtual void SetUp() {};
 
     virtual void TearDown() {};
@@ -40,17 +40,20 @@ class TestCQRRPTMatrix : public ::testing::Test {
             col = n;
             rank = k;
             A = Dense::create_strided({m, n}, RandLAPACK::Layout::COL_MAJOR,
-                                      Device::CPU, numeric_trait<T>::value);
+                                      Device::CPU,
+                                      to_enum_numeric_type<T>::value);
             R = Dense::create_strided({n, n}, RandLAPACK::Layout::COL_MAJOR,
-                                      Device::CPU, numeric_trait<T>::value);
-            A_cpy1 =
-                Dense::create_strided({m, n}, RandLAPACK::Layout::COL_MAJOR,
-                                      Device::CPU, numeric_trait<T>::value);
-            A_cpy2 =
-                Dense::create_strided({m, n}, RandLAPACK::Layout::COL_MAJOR,
-                                      Device::CPU, numeric_trait<T>::value);
+                                      Device::CPU,
+                                      to_enum_numeric_type<T>::value);
+            A_cpy1 = Dense::create_strided(
+                {m, n}, RandLAPACK::Layout::COL_MAJOR, Device::CPU,
+                to_enum_numeric_type<T>::value);
+            A_cpy2 = Dense::create_strided(
+                {m, n}, RandLAPACK::Layout::COL_MAJOR, Device::CPU,
+                to_enum_numeric_type<T>::value);
             I_ref = Dense::create_strided({k, k}, RandLAPACK::Layout::COL_MAJOR,
-                                          Device::CPU, numeric_trait<T>::value);
+                                          Device::CPU,
+                                          to_enum_numeric_type<T>::value);
         }
     };
 

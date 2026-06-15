@@ -13,22 +13,69 @@ enum class IntType : std::size_t { INT64 = 0, INT32 = 1, Count };
 using NumericPtrVariant = std::variant<double*, float*, __half*, uint32_t*>;
 using IntPtrVariant = std::variant<long int*, int*>;
 
+// Type mappings between concrete and enum types.
+
 template <typename T>
-struct numeric_trait {
+struct to_enum_numeric_type {
     static constexpr NumericType value = NumericType::Count;
 };
 
 template <>
-struct numeric_trait<double> {
+struct to_enum_numeric_type<double> {
     static constexpr NumericType value = NumericType::FP64;
 };
 template <>
-struct numeric_trait<float> {
+struct to_enum_numeric_type<float> {
     static constexpr NumericType value = NumericType::FP32;
 };
 template <>
-struct numeric_trait<half> {
+struct to_enum_numeric_type<half> {
     static constexpr NumericType value = NumericType::FP16;
 };
+
+template <NumericType N>
+struct to_concrete_numeric_type;
+
+template <>
+struct to_concrete_numeric_type<NumericType::FP64> {
+    using value = double;
+};
+template <>
+struct to_concrete_numeric_type<NumericType::FP32> {
+    using value = float;
+};
+template <>
+struct to_concrete_numeric_type<NumericType::FP16> {
+    using value = half;
+};
+
+template <IntType I>
+struct to_concrete_integer_type;
+template <>
+struct to_concrete_integer_type<IntType::INT64> {
+    using value = int64_t;
+};
+template <>
+struct to_concrete_integer_type<IntType::INT32> {
+    using value = int32_t;
+};
+
+// Metaprogramming utilities for kernel registration.
+
+// Compile-time value list.
+template <auto... Vs>
+struct vlist {};
+
+// Compile-time for_each.
+template <auto... Vs, typename F>
+void for_each(vlist<Vs...>, F&& f) {
+    (f.template operator()<Vs>(), ...);
+}
+
+// Lists of all devices, numeric types, and integer types for iteration.
+using all_devices = vlist<Device::CPU, Device::CUDA>;
+using all_numerics =
+    vlist<NumericType::FP64, NumericType::FP32, NumericType::FP16>;
+using all_ints = vlist<IntType::INT64, IntType::INT32>;
 
 }  // namespace RandLAPACK
