@@ -3,6 +3,7 @@
 #include <cuda_fp16.h>
 
 #include <variant>
+
 using half = __half;
 
 namespace RandLAPACK {
@@ -16,39 +17,39 @@ using IntPtrVariant = std::variant<long int*, int*>;
 // Type mappings between concrete and enum types.
 
 template <typename T>
-struct to_enum_numeric_type {
+struct to_enum_type {
     static constexpr NumericType value = NumericType::Count;
 };
 
 template <>
-struct to_enum_numeric_type<double> {
+struct to_enum_type<double> {
     static constexpr NumericType value = NumericType::FP64;
 };
 template <>
-struct to_enum_numeric_type<float> {
+struct to_enum_type<float> {
     static constexpr NumericType value = NumericType::FP32;
 };
 template <>
-struct to_enum_numeric_type<half> {
+struct to_enum_type<half> {
     static constexpr NumericType value = NumericType::FP16;
 };
 
 template <typename T>
-constexpr NumericType numeric_type_of = to_enum_numeric_type<T>::value;
+constexpr NumericType numeric_type_of = to_enum_type<T>::value;
 
 template <NumericType N>
-struct to_concrete_numeric_type;
+struct to_concrete_type;
 
 template <>
-struct to_concrete_numeric_type<NumericType::FP64> {
+struct to_concrete_type<NumericType::FP64> {
     using value = double;
 };
 template <>
-struct to_concrete_numeric_type<NumericType::FP32> {
+struct to_concrete_type<NumericType::FP32> {
     using value = float;
 };
 template <>
-struct to_concrete_numeric_type<NumericType::FP16> {
+struct to_concrete_type<NumericType::FP16> {
     using value = half;
 };
 

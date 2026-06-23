@@ -57,8 +57,6 @@ template <Device device_source, Device device_target, typename value_in_t,
           typename value_out_t, typename index_in_t, typename index_out_t>
 void copy_csr_storage(dim<2> size, SparseStorage& source,
                       SparseStorage& target) {
-    CsrStorage& S_source = std::get<CsrStorage>(source);
-    CsrStorage& S_target = std::get<CsrStorage>(target);
     if constexpr (device_source == RandLAPACK::Device::CPU &&
                   device_target == RandLAPACK::Device::CPU) {
         RandLAPACK::cpu::csr_copy_impl<value_in_t, value_out_t, index_in_t,

@@ -41,18 +41,18 @@ protected:
             rank = k;
             Context context = Context(Device::CPU);
             A = Dense::create_strided(context, RandLAPACK::Layout::COL_MAJOR,
-                                      to_enum_numeric_type<T>::value, {m, n});
+                                      to_enum_type<T>::value, {m, n});
             R = Dense::create_strided(context, RandLAPACK::Layout::COL_MAJOR,
-                                      to_enum_numeric_type<T>::value, {n, n});
+                                      to_enum_type<T>::value, {n, n});
             A_cpy1 =
                 Dense::create_strided(context, RandLAPACK::Layout::COL_MAJOR,
-                                      to_enum_numeric_type<T>::value, {m, n});
+                                      to_enum_type<T>::value, {m, n});
             A_cpy2 =
                 Dense::create_strided(context, RandLAPACK::Layout::COL_MAJOR,
-                                      to_enum_numeric_type<T>::value, {m, n});
+                                      to_enum_type<T>::value, {m, n});
             I_ref =
                 Dense::create_strided(context, RandLAPACK::Layout::COL_MAJOR,
-                                      to_enum_numeric_type<T>::value, {n, n});
+                                      to_enum_type<T>::value, {n, n});
         }
     };
 

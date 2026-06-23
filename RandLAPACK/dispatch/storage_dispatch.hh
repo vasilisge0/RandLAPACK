@@ -130,7 +130,7 @@ private:
         initialize_table_.fill(nullptr);
         for_each(all_devices{}, [&]<Device Dev>() {
             for_each(all_numerics{}, [&]<NumericType Nt>() {
-                using T = typename to_concrete_numeric_type<Nt>::value;
+                using T = typename to_concrete_type<Nt>::value;
                 initialize_table_[encode_init_free(MatrixFormat::STRIDED, Dev,
                                                    Nt)] =
                     &initialize_strided_storage<Dev, T>;
@@ -142,7 +142,7 @@ private:
         free_table_.fill(nullptr);
         for_each(all_devices{}, [&]<Device Dev>() {
             for_each(all_numerics{}, [&]<NumericType Nt>() {
-                using T = typename to_concrete_numeric_type<Nt>::value;
+                using T = typename to_concrete_type<Nt>::value;
                 free_table_[encode_init_free(MatrixFormat::STRIDED, Dev, Nt)] =
                     &free_strided_storage<Dev, T>;
             });
@@ -151,19 +151,22 @@ private:
 
     void fill_copy_table() {
         copy_table_.fill(nullptr);
-        for_each(all_devices{}, [&]<Device SrcDev>() {
-            for_each(all_devices{}, [&]<Device TgtDev>() {
-                for_each(all_numerics{}, [&]<NumericType SrcNt>() {
-                    for_each(all_numerics{}, [&]<NumericType TgtNt>() {
+        for_each(all_devices{}, [&]<Device source_device>() {
+            for_each(all_devices{}, [&]<Device target_device>() {
+                for_each(all_numerics{}, [&]<NumericType source_num_type>() {
+                    for_each(all_numerics{}, [&]<NumericType
+                                                     target_num_type>() {
                         using source_float_t =
-                            typename to_concrete_numeric_type<SrcNt>::value;
+                            typename to_concrete_type<source_num_type>::value;
                         using target_float_t =
-                            typename to_concrete_numeric_type<TgtNt>::value;
-                        copy_table_[encode_copy(MatrixFormat::STRIDED,
-                                                MatrixFormat::STRIDED, SrcDev,
-                                                TgtDev, SrcNt, TgtNt)] =
-                            &copy_strided_storage<
-                                SrcDev, TgtDev, source_float_t, target_float_t>;
+                            typename to_concrete_type<target_num_type>::value;
+                        copy_table_[encode_copy(
+                            MatrixFormat::STRIDED, MatrixFormat::STRIDED,
+                            source_device, target_device, source_num_type,
+                            target_num_type)] =
+                            &copy_strided_storage<source_device, target_device,
+                                                  source_float_t,
+                                                  target_float_t>;
                     });
                 });
             });
@@ -265,7 +268,7 @@ private:
         for_each(all_devices{}, [&]<Device Dev>() {
             for_each(all_numerics{}, [&]<NumericType Nt>() {
                 for_each(all_ints{}, [&]<IntType It>() {
-                    using T = typename to_concrete_numeric_type<Nt>::value;
+                    using T = typename to_concrete_type<Nt>::value;
                     using I = typename to_concrete_integer_type<It>::value;
                     initialize_table_[encode_init_free(MatrixFormat::CSR, Dev,
                                                        Nt, It)] =
@@ -280,7 +283,7 @@ private:
         for_each(all_devices{}, [&]<Device Dev>() {
             for_each(all_numerics{}, [&]<NumericType Nt>() {
                 for_each(all_ints{}, [&]<IntType It>() {
-                    using T = typename to_concrete_numeric_type<Nt>::value;
+                    using T = typename to_concrete_type<Nt>::value;
                     using I = typename to_concrete_integer_type<It>::value;
                     free_table_[encode_init_free(MatrixFormat::CSR, Dev, Nt,
                                                  It)] =
@@ -292,35 +295,39 @@ private:
 
     void fill_copy_table() {
         copy_table_.fill(nullptr);
-        for_each(all_devices{}, [&]<Device SrcDev>() {
-            for_each(all_devices{}, [&]<Device TgtDev>() {
-                for_each(all_numerics{}, [&]<NumericType SrcNt>() {
-                    for_each(all_numerics{}, [&]<NumericType TgtNt>() {
-                        for_each(all_ints{}, [&]<IntType source_int_tt>() {
-                            for_each(all_ints{}, [&]<IntType target_int_tt>() {
-                                // using source_float_t =
-                                //     typename
-                                //     to_concrete_numeric_type<SrcNt>::value;
-                                // using target_float_t =
-                                //     typename
-                                //     to_concrete_numeric_type<TgtNt>::value;
-                                // using source_int_t =
-                                //     typename
-                                //     to_concrete_integer_type<source_int_tt>::value;
-                                // using target_int_t =
-                                //     typename
-                                //     to_concrete_integer_type<target_int_tt>::value;
-                                // copy_table_[encode_copy(
-                                //     MatrixFormat::CSR, MatrixFormat::CSR,
-                                //     SrcDev, TgtDev, SrcNt, TgtNt,
-                                //     source_int_tt, target_int_tt)] =
-                                //     &copy_csr_storage<
-                                //         SrcDev, TgtDev, source_float_t,
-                                //         target_float_t, source_int_t,
-                                //         target_int_t>;
+        for_each(all_devices{}, [&]<Device source_device>() {
+            for_each(all_devices{}, [&]<Device target_device>() {
+                for_each(all_numerics{}, [&]<NumericType source_num_type>() {
+                    for_each(
+                        all_numerics{}, [&]<NumericType target_num_type>() {
+                            for_each(all_ints{}, [&]<IntType source_int_t>() {
+                                for_each(
+                                    all_ints{}, [&]<IntType target_int_t>() {
+                                        using source_float =
+                                            typename to_concrete_type<
+                                                source_num_type>::value;
+                                        using target_float =
+                                            typename to_concrete_type<
+                                                target_num_type>::value;
+                                        using source_int =
+                                            typename to_concrete_integer_type<
+                                                source_int_t>::value;
+                                        using target_int =
+                                            typename to_concrete_integer_type<
+                                                target_int_t>::value;
+                                        copy_table_[encode_copy(
+                                            MatrixFormat::CSR,
+                                            MatrixFormat::CSR, source_device,
+                                            target_device, source_num_type,
+                                            target_num_type, source_int_t,
+                                            target_int_t)] =
+                                            &copy_csr_storage<
+                                                source_device, target_device,
+                                                source_float, target_float,
+                                                source_int, target_int>;
+                                    });
                             });
                         });
-                    });
                 });
             });
         });

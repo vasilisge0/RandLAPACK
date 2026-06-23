@@ -5,15 +5,17 @@ The Matrix-API introduces the 3 following modules:
 1. High-level matrix API: 
 > Enables access to matrix objects without knowing the concrete types related
 > to the backend device for which memory is owned and the type in which data are
-> stored. This includes the Dense and Sparse structs and Matrix type defined as,
-> variant<Dense, Sparse> to be used in function argument to switch between those
+> stored. This includes the Dense and Sparse structs to be used in function
+> argument to switch between those
 > two types of objects.
 
 2. Internal API
-> Includes functions on act on internal matrix storage objects such is
-> DenseStorage / SparseStorage items. The correct kernel is selected via
-> a lookup on a table of functions. A kernel is dispatched based
-> matrix, device, and precision types.
+> Uses the Matrix type defined as variant<Dense, Sparse>, in order to keep
+> ``core'' functionality the agnostic to the matrix format. 
+> Functions acting on the internal matrix storage objects such is
+> DenseStorage / SparseStorage items are selected via a lookup on a table of
+> functions. The dispatched mechanism is based on the matrix, device, and
+> precision types.
 
 3. Implementations to initialize, free and copy functions.
 > Those kernels are registered to a Dense / Sparse registry.
