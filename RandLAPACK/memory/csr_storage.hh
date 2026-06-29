@@ -4,6 +4,7 @@
 #include "dimensions.hh"
 #include "memory.hh"
 #include "precision.hh"
+#include "storage_types.hh"
 #include "type_macros.hh"
 
 #ifdef __CUDACC__

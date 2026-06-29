@@ -2,6 +2,7 @@
 
 #include "dimensions.hh"
 #include "memory.hh"
+#include "storage_types.hh"
 
 namespace RandLAPACK {
 namespace cpu {
@@ -31,25 +32,17 @@ template <typename value_in_t, typename value_out_t, typename index_in_t,
           typename index_out_t>
 __host__ void csr_copy_impl(dim<2> size, SparseStorage& source,
                             SparseStorage& target) {
-    if ((static_cast<size_t>(source.index()) ==
-         static_cast<size_t>(RandLAPACK::MatrixFormat::CSR)) &&
-        (static_cast<size_t>(target.index()) ==
-         static_cast<size_t>(RandLAPACK::MatrixFormat::CSR))) {
-        CsrStorage& x = std::get<CsrStorage>(source);
-        CsrStorage& y = std::get<CsrStorage>(target);
-        strided_copy_kernel({x.nnz_, static_cast<size_t>(1)},
-                            std::get<value_out_t*>(x.values_), x.nnz_,
-                            std::get<value_in_t*>(y.values_), x.nnz_);
-        strided_copy_kernel({size[0] + 1, static_cast<size_t>(1)},
-                            std::get<index_out_t*>(x.row_ptrs_), size[0] + 1,
-                            std::get<index_in_t*>(y.row_ptrs_), size[0] + 1);
-        strided_copy_kernel({x.nnz_, static_cast<size_t>(1)},
-                            std::get<index_out_t*>(x.col_idxs_), x.nnz_,
-                            std::get<index_in_t*>(y.col_idxs_), x.nnz_);
-    } else {
-        throw std::runtime_error(
-            "Copying values from matrixs of different types.");
-    }
+    CsrStorage& x = std::get<CsrStorage>(source);
+    CsrStorage& y = std::get<CsrStorage>(target);
+    strided_copy_kernel({x.nnz_, static_cast<size_t>(1)},
+                        std::get<value_in_t*>(x.values_), x.nnz_,
+                        std::get<value_out_t*>(y.values_), x.nnz_);
+    strided_copy_kernel({size[0] + 1, static_cast<size_t>(1)},
+                        std::get<index_in_t*>(x.row_ptrs_), size[0] + 1,
+                        std::get<index_out_t*>(y.row_ptrs_), size[0] + 1);
+    strided_copy_kernel({x.nnz_, static_cast<size_t>(1)},
+                        std::get<index_in_t*>(x.col_idxs_), x.nnz_,
+                        std::get<index_out_t*>(y.col_idxs_), x.nnz_);
 }
 
 }  // namespace cpu

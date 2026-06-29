@@ -1,0 +1,5 @@
+if(EXISTS "/global/homes/v/vgeorgio/RandLAPACK/test/RandLAPACK_tests[1]_tests.cmake")
+  include("/global/homes/v/vgeorgio/RandLAPACK/test/RandLAPACK_tests[1]_tests.cmake")
+else()
+  add_test(RandLAPACK_tests_NOT_BUILT RandLAPACK_tests_NOT_BUILT)
+endif()

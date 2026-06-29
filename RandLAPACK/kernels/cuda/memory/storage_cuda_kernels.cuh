@@ -8,6 +8,7 @@
 #include "dimensions.hh"
 #include "memory.hh"
 #include "precision.hh"
+#include "storage_types.hh"
 #include "type_macros.hh"
 
 namespace RandLAPACK {
@@ -55,30 +56,11 @@ FOR_ALL_INDEX_PAIRS(INST_COPY_LAUNCHER)
 template <typename value_in_t, typename value_out_t>
 __host__ void dense_copy_impl(dim<2> size, DenseStorage& source,
                               DenseStorage& target) {
-    std::visit(
-        [&](auto& x, auto& y) {
-            using Tx = std::decay_t<decltype(x)>;
-            using Ty = std::decay_t<decltype(y)>;
-            if constexpr ((std::is_same_v<Tx, DenseStorage>) &&
-                          (std::is_same_v<Ty, DenseStorage>)) {
-                copy_launcher(size, std::get<value_out_t*>(x.values_),
-                              x.lead_dim_, std::get<value_in_t*>(y.values_),
-                              y.lead_dim_);
-            } else if constexpr ((std::is_same_v<Tx, CsrStorage>) &&
-                                 (std::is_same_v<Ty, CsrStorage>)) {
-                copy_launcher({x.nnz_, 1}, std::get<value_out_t*>(x.values_),
-                              x.nnz_, std::get<value_in_t*>(y.values_), x.nnz_);
-                copy_launcher({size[0] + 1, 1}, std::get<int*>(x.row_ptrs_),
-                              size[0] + 1, std::get<int*>(y.row_ptrs_),
-                              size[0] + 1);
-                copy_launcher({x.nnz_, 1}, std::get<int*>(x.col_idxs_), x.nnz_,
-                              std::get<int*>(y.col_idxs_), x.nnz_);
-            } else {
-                throw std::runtime_error(
-                    "Copying values from matrixs of different types.");
-            }
-        },
-        source, target);
+    StridedStorage& x = std::get<StridedStorage>(source);
+    StridedStorage& y = std::get<StridedStorage>(target);
+    copy_launcher(size, std::get<value_in_t*>(x.values_),
+                  x.lead_dim_, std::get<value_out_t*>(y.values_),
+                  y.lead_dim_);
 }
 
 #define INST_DENSE_COPY_IMPL(T1, T2)                                      \
@@ -91,14 +73,21 @@ template <typename value_in_t, typename value_out_t, typename index_in_t,
           typename index_out_t>
 __host__ void csr_copy_impl(dim<2> size, SparseStorage& source,
                             SparseStorage& target) {
-    if ((static_cast<size_t>(source.index()) == CSR) &&
-        (static_cast<size_t>(target.index()) == CSR)) {
-        copy_launcher({x.nnz_, 1}, std::get<value_out_t*>(x.values_), x.nnz_,
+    if ((static_cast<size_t>(source.index()) ==
+         static_cast<size_t>(RandLAPACK::MatrixFormat::CSR)) &&
+        (static_cast<size_t>(target.index()) ==
+         static_cast<size_t>(RandLAPACK::MatrixFormat::CSR))) {
+        CsrStorage& x = std::get<CsrStorage>(source);
+        CsrStorage& y = std::get<CsrStorage>(target);
+        copy_launcher(dim<2>{x.nnz_, static_cast<size_t>(1)},
+                      std::get<value_out_t*>(x.values_), x.nnz_,
                       std::get<value_in_t*>(y.values_), x.nnz_);
-        copy_launcher({size[0] + 1, 1}, std::get<int*>(x.row_ptrs_),
-                      size[0] + 1, std::get<int*>(y.row_ptrs_), size[0] + 1);
-        copy_launcher({x.nnz_, 1}, std::get<int*>(x.col_idxs_), x.nnz_,
-                      std::get<int*>(y.col_idxs_), x.nnz_);
+        copy_launcher(dim<2>{size[0] + 1, static_cast<size_t>(1)},
+                      std::get<index_out_t*>(x.row_ptrs_), size[0] + 1,
+                      std::get<index_in_t*>(y.row_ptrs_), size[0] + 1);
+        copy_launcher(dim<2>{x.nnz_, static_cast<size_t>(1)},
+                      std::get<index_out_t*>(x.col_idxs_), x.nnz_,
+                      std::get<index_in_t*>(y.col_idxs_), x.nnz_);
     } else {
         throw std::runtime_error(
             "Copying values from different storage types is not supported by "

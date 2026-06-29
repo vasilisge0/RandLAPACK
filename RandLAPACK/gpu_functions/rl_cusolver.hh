@@ -37,16 +37,16 @@ using cublasFillMode_t = char;
 // We have them return 1, since this corresponds to the value of
 // CUSOLVER_STATUS_NOT_INITIALIZED in the cusolverStatus_t enum.
 // 
-int cusolverDnCreate(cusolverDnHandle_t *x) {
+inline int cusolverDnCreate(cusolverDnHandle_t *x) {
     return 1;
 }
-int cusolverDnDestroy(cusolverDnHandle_t x) {
+inline int cusolverDnDestroy(cusolverDnHandle_t x) {
     return 1;
 }
-int cublasCreate(cublasHandle_t *x) {
+inline int cublasCreate(cublasHandle_t *x) {
     return 1;
 }
-int cublasDestroy(cublasHandle_t x) {
+inline int cublasDestroy(cublasHandle_t x) {
     return 1;
 }
 // 

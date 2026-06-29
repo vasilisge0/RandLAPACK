@@ -70,8 +70,10 @@ files added:
 
 You can run the tests defines in this file as:
 
-path-to-randlapack-build/bin/RandLAPACK_tests --gtest_filter="TestCQRRPTMatrix.CQRRPT_full_rank_no_hqrrp"
-path-to-randlapack-build/bin/RandLAPACK_tests --gtest_filter="TestCQRRPTMatrix.CQRRPT_low_rank_with_hqrrp"
-path-to-randlapack-build/bin/RandLAPACK_tests --gtest_filter="TestCQRRPTMatrix.CQRRPT_low_rank_with_bqrrp"
-path-to-randlapack-build/bin/RandLAPACK_tests --gtest_filter="TestCQRRPTMatrix.CQRRPT_bad_orth"
-path-to-randlapack-build/bin/RandLAPACK_tests --gtest_filter="TestCQRRPTMatrix.CQRRPT_orthogonalization_mode_low_rank"
+./path-to-randlapack-build/bin/RandLAPACK_tests --gtest_filter='TestStorageDispatch.*'
+
+./path-to-randlapack-build/bin/RandLAPACK_tests --gtest_filter="TestCQRRPTMatrix.CQRRPT_full_rank_no_hqrrp"
+./path-to-randlapack-build/bin/RandLAPACK_tests --gtest_filter="TestCQRRPTMatrix.CQRRPT_low_rank_with_hqrrp"
+./path-to-randlapack-build/bin/RandLAPACK_tests --gtest_filter="TestCQRRPTMatrix.CQRRPT_low_rank_with_bqrrp"
+./path-to-randlapack-build/bin/RandLAPACK_tests --gtest_filter="TestCQRRPTMatrix.CQRRPT_bad_orth"
+./path-to-randlapack-build/bin/RandLAPACK_tests --gtest_filter="TestCQRRPTMatrix.CQRRPT_orthogonalization_mode_low_rank"

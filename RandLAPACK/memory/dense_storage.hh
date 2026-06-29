@@ -4,6 +4,7 @@
 #include "memory.hh"
 #include "precision.hh"
 #include "storage_cpu_kernels.hh"
+#include "storage_types.hh"
 #include "type_macros.hh"
 
 namespace RandLAPACK {

@@ -23,6 +23,7 @@ if (GTest_FOUND)
         drivers/test_abrik.cc
         drivers/test_orth_linop.cc
         matrix_api/test_cqrrpt_matrix.cc
+        matrix_api/test_storage_dispatch.cc
         misc/test_util.cc
         misc/test_pdkernels.cc
         linops/test_linops.cc
@@ -43,6 +44,7 @@ if (GTest_FOUND)
             comps/test_util_gpu.cu
             drivers/test_cqrrpt_gpu.cu
             drivers/test_bqrrp_gpu.cu
+            matrix_api/test_storage_dispatch_gpu.cu
         )
 
         # Create CUDA test executables

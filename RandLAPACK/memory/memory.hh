@@ -25,14 +25,21 @@ Status malloc(size_t len, value_t** values) {
             "RandLAPACK::Device::CUDA");
     }
 }  // malloc
-template Status malloc<Device::CPU, double>(size_t len, double** values);
-template Status malloc<Device::CPU, float>(size_t len, float** values);
-template Status malloc<Device::CPU, half>(size_t len, half** values);
-template Status malloc<Device::CPU, int>(size_t len, int** values);
-template Status malloc<Device::CUDA, double>(size_t len, double** values);
-template Status malloc<Device::CUDA, float>(size_t len, float** values);
-template Status malloc<Device::CUDA, half>(size_t len, half** values);
-template Status malloc<Device::CUDA, int>(size_t len, int** values);
+
+#define _INST_MALLOC(device, T) \
+    template Status malloc<device, T>(size_t len, T** values);
+
+#define INST_MALLOC_ALL_TYPES(device) \
+    _INST_MALLOC(device, double)      \
+    _INST_MALLOC(device, float)       \
+    _INST_MALLOC(device, half)        \
+    _INST_MALLOC(device, int)
+
+INST_MALLOC_ALL_TYPES(Device::CPU)
+INST_MALLOC_ALL_TYPES(Device::CUDA)
+
+#undef _INST_MALLOC
+#undef INST_MALLOC_ALL_TYPES
 
 template <Device device, typename value_t>
 Status free(value_t* values) {
@@ -55,56 +62,19 @@ Status free(value_t* values) {
     }
 }  // free
 
-template Status free<Device::CPU, double>(double* values);
-template Status free<Device::CPU, float>(float* values);
-template Status free<Device::CPU, half>(half* values);
-template Status free<Device::CPU, int>(int* values);
-template Status free<Device::CUDA, double>(double* values);
-template Status free<Device::CUDA, float>(float* values);
-template Status free<Device::CUDA, half>(half* values);
-template Status free<Device::CUDA, int>(int* values);
+#define _INST_FREE(device, T) \
+    template Status free<device, T>(T* values);
 
-struct StridedStorage {
-    dim<2> size_ = {0, 0};
-    size_t lead_dim_ = 0;
-    size_t num_elems_ = 0;
-    Layout layout_ = Layout::COL_MAJOR;
-    NumericPtrVariant values_;
+#define INST_FREE_ALL_TYPES(device) \
+    _INST_FREE(device, double)      \
+    _INST_FREE(device, float)       \
+    _INST_FREE(device, half)        \
+    _INST_FREE(device, int)
 
-    StridedStorage() = default;
-    StridedStorage(NumericType store_type, Layout layout, dim<2> size,
-                   size_t lead_dim)
-        : size_{size}, lead_dim_{lead_dim}, layout_{layout} {}
-    StridedStorage(Layout layout, dim<2> size, size_t lead_dim,
-                   NumericPtrVariant values)
-        : size_{size}, lead_dim_{lead_dim}, layout_{layout}, values_{values} {}
-};
+INST_FREE_ALL_TYPES(Device::CPU)
+INST_FREE_ALL_TYPES(Device::CUDA)
 
-struct CsrStorage {
-    dim<2> size_ = {0, 0};
-    size_t nnz_;
-    NumericPtrVariant values_;
-    IntPtrVariant row_ptrs_;
-    IntPtrVariant col_idxs_;
-
-    CsrStorage() = default;
-    CsrStorage(NumericType value_type, IntType index_type, dim<2> size,
-               size_t nnz)
-        : size_{size}, nnz_{nnz} {}
-    CsrStorage(dim<2> size, size_t nnz, NumericPtrVariant values,
-               IntPtrVariant row_ptrs, IntPtrVariant col_idxs)
-        : size_{size},
-          nnz_{nnz},
-          values_{values},
-          row_ptrs_{row_ptrs},
-          col_idxs_{col_idxs} {}
-};
-
-enum class DenseFormat : std::size_t { STRIDED = 0, Count };
-enum class SparseFormat : std::size_t { CSR = 1, Count };
-enum class MatrixFormat : std::size_t { STRIDED = 0, CSR = 1, Count };
-
-using DenseStorage = std::variant<StridedStorage>;
-using SparseStorage = std::variant<CsrStorage>;
+#undef _INST_FREE
+#undef INST_FREE_ALL_TYPES
 
 }  // namespace RandLAPACK

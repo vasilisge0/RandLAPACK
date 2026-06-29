@@ -27,13 +27,13 @@ protected:
         int64_t col;
         int64_t rank;  // has to be modifiable
 
-        std::unique_ptr<Dense> A;
-        std::unique_ptr<Dense> R;
+        Dense A;
+        Dense R;
 
         std::vector<int64_t> J;
-        std::unique_ptr<Dense> A_cpy1;
-        std::unique_ptr<Dense> A_cpy2;
-        std::unique_ptr<Dense> I_ref;
+        Dense A_cpy1;
+        Dense A_cpy2;
+        Dense I_ref;
 
         CQRRPTTestData(int64_t m, int64_t n, int64_t k) : J(n, 0) {
             row = m;
@@ -61,9 +61,9 @@ protected:
         T& norm_A, CQRRPTTestData<T>& all_data) {
         auto m = all_data.row;
         auto n = all_data.col;
-        StridedView<T> A(*all_data.A);
-        StridedView<T> A_cpy1(*all_data.A_cpy1);
-        StridedView<T> A_cpy2(*all_data.A_cpy2);
+        StridedView<T> A(all_data.A);
+        StridedView<T> A_cpy1(all_data.A_cpy1);
+        StridedView<T> A_cpy2(all_data.A_cpy2);
 
         lapack::lacpy(MatrixType::General, m, n, A.values_, m, A_cpy1.values_,
                       m);
@@ -80,11 +80,11 @@ protected:
         auto n = all_data.col;
         auto k = all_data.rank;
 
-        StridedView<T> A(*all_data.A);
-        StridedView<T> A_cpy1(*all_data.A_cpy1);
-        StridedView<T> A_cpy2(*all_data.A_cpy2);
-        StridedView<T> R(*all_data.R);
-        // StridedView<T> I_ref(*all_data.I_ref);
+        StridedView<T> A(all_data.A);
+        StridedView<T> A_cpy1(all_data.A_cpy1);
+        StridedView<T> A_cpy2(all_data.A_cpy2);
+        StridedView<T> R(all_data.R);
+        // StridedView<T> I_ref(all_data.I_ref);
 
         // RandLAPACK::util::upsize(k * k, I_ref.values_);
         std::vector<T> I_ref(n * n, 0.0);
@@ -144,10 +144,10 @@ protected:
         auto m = all_data.row;
         auto n = all_data.col;
 
-        StridedView<T> A(*all_data.A);
-        StridedView<T> A_cpy1(*all_data.A_cpy1);
-        StridedView<T> A_cpy2(*all_data.A_cpy2);
-        StridedView<T> R(*all_data.R);
+        StridedView<T> A(all_data.A);
+        StridedView<T> A_cpy1(all_data.A_cpy1);
+        StridedView<T> A_cpy2(all_data.A_cpy2);
+        StridedView<T> R(all_data.R);
 
         CQRRPT.call(m, n, A.values_, m, R.values_, n, all_data.J.data(),
                     d_factor, state);
@@ -176,11 +176,11 @@ protected:
         auto k_expected =
             all_data.rank;  // Expected rank from matrix generation
 
-        StridedView<T> A(*all_data.A);
-        StridedView<T> A_cpy1(*all_data.A_cpy1);
-        StridedView<T> A_cpy2(*all_data.A_cpy2);
-        StridedView<T> R(*all_data.R);
-        // StridedView<T> I_ref(*all_data.I_ref);
+        StridedView<T> A(all_data.A);
+        StridedView<T> A_cpy1(all_data.A_cpy1);
+        StridedView<T> A_cpy2(all_data.A_cpy2);
+        StridedView<T> R(all_data.R);
+        // StridedView<T> I_ref(all_data.I_ref);
 
         CQRRPT.call(m, n, A.values_, m, R.values_, n, all_data.J.data(),
                     d_factor, state);
@@ -243,7 +243,7 @@ TEST_F(TestCQRRPTMatrix, CQRRPT_full_rank_no_hqrrp) {
     m_info.rank = k;
     m_info.exponent = 2.0;
 
-    StridedView<double> A(*all_data.A);
+    StridedView<double> A(all_data.A);
     RandLAPACK::gen::mat_gen(m_info, A.values_, state);
 
     norm_and_copy_computational_helper(norm_A, all_data);
@@ -269,7 +269,7 @@ TEST_F(TestCQRRPTMatrix, CQRRPT_low_rank_with_hqrrp) {
     m_info.cond_num = 2;
     m_info.rank = k;
     m_info.exponent = 2.0;
-    StridedView<double> A(*all_data.A);
+    StridedView<double> A(all_data.A);
     RandLAPACK::gen::mat_gen(m_info, A.values_, state);
 
     norm_and_copy_computational_helper(norm_A, all_data);
@@ -295,7 +295,7 @@ TEST_F(TestCQRRPTMatrix, CQRRPT_low_rank_with_bqrrp) {
     m_info.cond_num = 2;
     m_info.rank = k;
     m_info.exponent = 2.0;
-    StridedView<double> A(*all_data.A);
+    StridedView<double> A(all_data.A);
     RandLAPACK::gen::mat_gen(m_info, A.values_, state);
     norm_and_copy_computational_helper(norm_A, all_data);
     test_CQRRPT_general(d_factor, norm_A, all_data, CQRRPT, state);
@@ -320,7 +320,7 @@ TEST_F(TestCQRRPTMatrix, CQRRPT_bad_orth) {
     RandLAPACK::gen::mat_gen_info<double> m_info(m, n,
                                                  RandLAPACK::gen::adverserial);
     m_info.scaling = 1e7;
-    StridedView<double> A(*all_data.A);
+    StridedView<double> A(all_data.A);
     RandLAPACK::gen::mat_gen(m_info, A.values_, state);
     norm_and_copy_computational_helper(norm_A, all_data);
     test_CQRRPT_general(d_factor, norm_A, all_data, CQRRPT, state);
@@ -347,7 +347,7 @@ TEST_F(TestCQRRPTMatrix, CQRRPT_orthogonalization_mode_low_rank) {
     m_info.cond_num = 100;
     m_info.rank = k;
     m_info.exponent = 2.0;
-    StridedView<double> A(*all_data.A);
+    StridedView<double> A(all_data.A);
     RandLAPACK::gen::mat_gen(m_info, A.values_, state);
     norm_and_copy_computational_helper(norm_A, all_data);
     test_CQRRPT_orthogonalization(d_factor, all_data, CQRRPT, state);
