@@ -54,6 +54,21 @@ if (GTest_FOUND)
 
         # Discover CUDA tests
         gtest_discover_tests(RandLAPACK_tests_gpu)
+
+        # RandBLAS CUDA kernel tests
+        set(RANDBLAS_CUDA_KERNEL_SRCS
+            ../RandBLAS/test/kernels/test_sparse_skops.cc
+        )
+        set_source_files_properties(${RANDBLAS_CUDA_KERNEL_SRCS} PROPERTIES LANGUAGE CUDA)
+        add_executable(randblas_cuda_kernel_tests ${RANDBLAS_CUDA_KERNEL_SRCS})
+        target_link_libraries(randblas_cuda_kernel_tests RandLAPACK GTest::GTest GTest::Main CUDA::cudart)
+        gtest_discover_tests(randblas_cuda_kernel_tests)
+
+        # RandBLAS sparse sketch construction benchmark (GPU vs CPU)
+        set(RANDBLAS_SPARSE_BENCH_SRC ../RandBLAS/test/kernels/bench_sparse_skops_gpu.cc)
+        set_source_files_properties(${RANDBLAS_SPARSE_BENCH_SRC} PROPERTIES LANGUAGE CUDA)
+        add_executable(bench_sparse_skops_gpu ${RANDBLAS_SPARSE_BENCH_SRC})
+        target_link_libraries(bench_sparse_skops_gpu RandLAPACK CUDA::cudart CUDA::cusparse)
     endif()
 
     # Create additional tests

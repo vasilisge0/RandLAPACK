@@ -2,6 +2,7 @@
 
 #include <array>
 #include <memory>
+#include <optional>
 #include <variant>
 
 #include "context.hh"
@@ -89,7 +90,7 @@ struct StridedView {
         lead_dim_ = storage.lead_dim_;
         layout_ = storage.layout_;
         values_ = values;
-        device_ = source.device_;
+        device_ = *source.device_;
         num_elems_ = storage.num_elems_;
     }
 };
@@ -101,7 +102,7 @@ struct Dense {
     friend struct StridedView;
 
 private:
-    Device device_;
+    std::optional<Device> device_;
     DenseStorage storage_;
 
     Dense(Context& context, MatrixFormat matrix_type, NumericType store_type,
@@ -120,15 +121,17 @@ public:
 
     Dense(Dense&& other) noexcept
         : device_(other.device_), storage_(other.storage_) {
+        other.device_ = std::nullopt;
         other.storage_ = StridedStorage();
     }
 
     Dense& operator=(Dense&& other) noexcept {
         if (this != &other) {
-            if (device_ < Device::Count)
-                detail::free_dense_storage(device_, storage_);
+            if (device_)
+                detail::free_dense_storage(*device_, storage_);
             device_ = other.device_;
             storage_ = other.storage_;
+            other.device_ = std::nullopt;
             other.storage_ = StridedStorage();
         }
         return *this;
@@ -175,7 +178,7 @@ public:
             throw std::invalid_argument(
                 "Copying from matrix of incompatible size.");
 
-        detail::copy_dense_storage(size, source.device_, device_,
+        detail::copy_dense_storage(size, *source.device_, *device_,
                                    source.storage_, storage_);
     }
 
@@ -203,7 +206,7 @@ public:
         return static_cast<MatrixFormat>(storage_.index());
     }
 
-    Device get_device() const { return device_; }
+    Device get_device() const { return *device_; }
 
     NumericType get_value_type() const {
         return std::visit(
@@ -219,8 +222,8 @@ public:
     }
 
     ~Dense() {
-        if (device_ < Device::Count)
-            detail::free_dense_storage(device_, storage_);
+        if (device_)
+            detail::free_dense_storage(*device_, storage_);
     }
 };
 
@@ -228,7 +231,7 @@ template <typename value_t>
 StridedView<value_t> as_strided_view(Dense& source) {
     StridedStorage storage = std::get<StridedStorage>(source.storage_);
     return StridedView<value_t>{
-        source.device_,    storage.size_,
+        *source.device_,   storage.size_,
         storage.lead_dim_, storage.num_elems_,
         storage.layout_,   std::get<value_t*>(storage.values_)};
 }
@@ -238,14 +241,14 @@ struct Sparse {
     friend struct CsrView;
 
 private:
-    Device device_;
+    std::optional<Device> device_;
     SparseStorage storage_;
 
     Sparse(Context& context, NumericType value_type, IntType index_type,
            dim<2> size, size_t nnz) {
         device_ = context.get_device();
         storage_ = CsrStorage(value_type, index_type, size, nnz);
-        detail::initialize_sparse_storage(device_, storage_);
+        detail::initialize_sparse_storage(*device_, storage_);
     }
 
 public:
@@ -253,15 +256,17 @@ public:
 
     Sparse(Sparse&& other) noexcept
         : device_(other.device_), storage_(other.storage_) {
+        other.device_ = std::nullopt;
         other.storage_ = CsrStorage();
     }
 
     Sparse& operator=(Sparse&& other) noexcept {
         if (this != &other) {
-            if (device_ < Device::Count)
-                detail::free_sparse_storage(device_, storage_);
+            if (device_)
+                detail::free_sparse_storage(*device_, storage_);
             device_ = other.device_;
             storage_ = other.storage_;
+            other.device_ = std::nullopt;
             other.storage_ = CsrStorage();
         }
         return *this;
@@ -294,7 +299,7 @@ public:
             throw std::invalid_argument(
                 "Copying from matrix of incompatible size.");
 
-        detail::copy_sparse_storage(size, source.device_, device_,
+        detail::copy_sparse_storage(size, *source.device_, *device_,
                                     source.storage_, storage_);
     }
 
@@ -332,7 +337,7 @@ public:
             storage_);
     }
 
-    Device get_device() const { return device_; }
+    Device get_device() const { return *device_; }
 
     NumericType get_value_type() const {
         return std::visit(
@@ -355,7 +360,10 @@ public:
             storage_);
     }
 
-    ~Sparse() { detail::free_sparse_storage(device_, storage_); }
+    ~Sparse() {
+        if (device_)
+            detail::free_sparse_storage(*device_, storage_);
+    }
 };
 
 template <typename value_t, typename index_t>
@@ -374,14 +382,14 @@ struct CsrView {
         col_idxs_ = std::get<index_t*>(storage.col_idxs_);
         size_ = storage.size_;
         nnz_ = storage.nnz_;
-        device_ = source.device_;
+        device_ = *source.device_;
     }
 };
 
 template <typename value_t, typename index_t>
 CsrView<value_t, index_t> as_csr_view(Sparse& source) {
     CsrStorage storage = std::get<CsrStorage>(source.storage_);
-    return CsrView<value_t, index_t>{source.device_,    storage.size_,
+    return CsrView<value_t, index_t>{*source.device_,   storage.size_,
                                      storage.nnz_,      storage.values_,
                                      storage.row_ptrs_, storage.col_idxs_};
 }
