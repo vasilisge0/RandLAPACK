@@ -69,6 +69,11 @@ if (GTest_FOUND)
         set_source_files_properties(${RANDBLAS_SPARSE_BENCH_SRC} PROPERTIES LANGUAGE CUDA)
         add_executable(bench_sparse_skops_gpu ${RANDBLAS_SPARSE_BENCH_SRC})
         target_link_libraries(bench_sparse_skops_gpu RandLAPACK CUDA::cudart CUDA::cusparse)
+        if (OpenMP_CXX_FOUND)
+            target_link_libraries(bench_sparse_skops_gpu OpenMP::OpenMP_CXX)
+            target_compile_options(bench_sparse_skops_gpu PRIVATE
+                $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
+        endif()
     endif()
 
     # Create additional tests
